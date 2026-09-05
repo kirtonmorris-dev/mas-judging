@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mas Judging — Live Carnival Scoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg: #101B2D;
+    --bg-alt: #182A44;
+    --card: #FBF7EF;
+    --ink: #17202B;
+    --ink-soft: #5A6472;
+    --gold: #E7A33E;
+    --magenta: #D6336C;
+    --teal: #2FB6A6;
+    --green: #4C9A6A;
+    --danger: #C1443B;
+    --line: rgba(23,32,43,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: radial-gradient(circle at 20% 0%, var(--bg-alt), var(--bg) 60%);
+    color: var(--card);
+    font-family:'Inter', system-ui, sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .display{ font-family:'Bebas Neue', system-ui, sans-serif; letter-spacing:0.03em; }
+
+  .pennants{ display:flex; height:22px; width:100%; overflow:hidden; }
+  .pennants span{ flex:1; clip-path: polygon(0 0, 100% 0, 50% 100%); height:22px; }
+  .pennants span:nth-child(6n+1){background:var(--gold);}
+  .pennants span:nth-child(6n+2){background:var(--magenta);}
+  .pennants span:nth-child(6n+3){background:var(--teal);}
+  .pennants span:nth-child(6n+4){background:#7A6FF0;}
+  .pennants span:nth-child(6n+5){background:var(--gold);}
+  .pennants span:nth-child(6n+6){background:var(--magenta);}
+
+  header{ padding:22px 20px 14px; text-align:center; }
+  header h1{ font-size:2.4rem; margin:0; line-height:0.95; }
+  header p{ margin:6px 0 0; color:#B9C3D4; font-size:0.85rem; letter-spacing:0.04em; text-transform:uppercase; }
+
+  .container{ max-width:520px; margin:0 auto; padding:0 16px; }
+
+  .modebar{ display:flex; justify-content:center; gap:8px; margin:16px 0; }
+  .modebar button{
+    background:transparent; border:1px solid rgba(255,255,255,0.25); color:var(--card);
+    padding:8px 16px; border-radius:999px; font-family:'Inter'; font-weight:600; font-size:0.8rem; cursor:pointer;
+  }
+  .modebar button.active{ background:var(--gold); border-color:var(--gold); color:var(--ink); }
+
+  .card{ background:var(--card); color:var(--ink); border-radius:14px; padding:18px; margin-bottom:16px; position:relative; }
+  .card.ticket::after{
+    content:""; position:absolute; bottom:-8px; left:0; right:0; height:16px;
+    background-image: radial-gradient(circle 6px at 12px 0, var(--bg) 6px, transparent 7px);
+    background-size: 24px 16px; background-repeat: repeat-x;
+  }
+
+  label{ display:block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:6px; }
+  select, input[type=text], input[type=tel], input[type=number]{
+    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:#fff; font-family:'Inter'; font-size:1rem; color:var(--ink); margin-bottom:14px;
+  }
+  .row{ display:flex; gap:10px; }
+  .row > *{ flex:1; }
+
+  .btn{ display:inline-block; border:none; border-radius:10px; padding:13px 18px; font-family:'Inter'; font-weight:700; font-size:0.95rem; cursor:pointer; text-align:center; }
+  .btn-primary{ background:var(--gold); color:var(--ink); width:100%; }
+  .btn-primary:disabled{ background:#ddd; color:#999; cursor:not-allowed; }
+  .btn-outline{ background:transparent; border:1.5px solid var(--ink); color:var(--ink); }
+  .btn-outline-light{ background:transparent; border:1.5px solid rgba(251,247,239,0.55); color:var(--card); }
+  .btn-danger{ background:transparent; border:1.5px solid var(--danger); color:var(--danger); font-size:0.78rem; padding:8px 12px; }
+  .btn-small{ font-size:0.8rem; padding:8px 14px; }
+
+  .contestant-list{ display:flex; flex-direction:column; gap:10px; }
+  .contestant-item{
+    background:var(--card); color:var(--ink); border-radius:12px; padding:14px;
+    display:flex; justify-content:space-between; align-items:center; cursor:pointer; border:1.5px solid transparent;
+  }
+  .contestant-item:hover{ border-color:var(--gold); }
+  .contestant-item .info b{ display:block; font-size:1rem; }
+  .contestant-item .info span{ display:block; color:var(--ink-soft); font-size:0.8rem; }
+  .badge{ font-size:0.7rem; font-weight:700; padding:4px 9px; border-radius:999px; white-space:nowrap; }
+  .badge.done{ background:#DFF0E4; color:var(--green); }
+  .badge.pending{ background:#F3E7D0; color:var(--gold); }
+
+  .criterion{ margin-bottom:16px; }
+  .criterion .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .criterion .top .name{ font-weight:700; font-size:0.92rem; color:var(--ink); }
+  .criterion .top .val{ font-family:'Bebas Neue'; font-size:1.5rem; color:var(--magenta); }
+  .score-input-row{ display:flex; align-items:center; gap:10px; }
+  .score-input{ width:90px; padding:12px; border-radius:10px; border:1.5px solid var(--line); font-family:'Bebas Neue'; font-size:1.6rem; color:var(--ink); background:#fff; text-align:center; }
+  .score-max{ font-size:0.85rem; color:var(--ink-soft); }
+  input[type=range]{ width:100%; accent-color: var(--magenta); height:28px; }
+
+  .total-strip{
+    display:flex; justify-content:space-between; align-items:center; background:var(--ink); color:var(--card);
+    border-radius:10px; padding:12px 16px; margin:6px 0 16px;
+  }
+  .total-strip .num{ font-family:'Bebas Neue'; font-size:2rem; color:var(--gold); }
+
+  .pin-wrap{ text-align:center; padding:40px 0; }
+  .pin-wrap input{ text-align:center; letter-spacing:0.3em; font-size:1.4rem; }
+
+  table{ width:100%; border-collapse:collapse; font-size:0.85rem; table-layout:fixed; }
+  th, td{ padding:6px 3px; text-align:left; border-bottom:1px solid var(--line); overflow-wrap:break-word; }
+  th{ text-transform:uppercase; font-size:0.62rem; color:var(--ink-soft); letter-spacing:0.02em; }
+  td.num{ font-family:'Bebas Neue'; font-size:1rem; }
+  td.num.muted{ color:#C9C2B4; font-family:'Inter'; font-size:0.9rem; }
+  tr.rank1{ background:#FBF0D9; }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .chip{ background:#fff; border:1.5px solid var(--line); border-radius:999px; padding:6px 12px; font-size:0.82rem; display:flex; align-items:center; gap:8px; }
+  .chip button{ background:none; border:none; color:var(--danger); font-weight:800; cursor:pointer; font-size:0.9rem; line-height:1; padding:0; }
+  .chip.event{ background:var(--teal); color:#fff; border-color:var(--teal); cursor:pointer; }
+  .chip.event.active{ background:var(--magenta); border-color:var(--magenta); }
+  .chip .pinflag{ font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:999px; }
+  .chip .pinflag.set{ background:#DFF0E4; color:var(--green); }
+  .chip .pinflag.unset{ background:#F3E7D0; color:var(--gold); }
+  .chip .reset{ background:none; border:none; color:var(--ink-soft); font-size:0.68rem; text-decoration:underline; cursor:pointer; padding:0; }
+  .chip.assign{ cursor:pointer; user-select:none; }
+  .chip.assign.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
+  .chip.assign.off{ background:#fff; color:var(--ink-soft); }
+  .chip.etype{ cursor:pointer; user-select:none; }
+  .chip.etype.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+
+  .section-title{ font-family:'Bebas Neue'; font-size:1.3rem; letter-spacing:0.03em; color:var(--card); margin:22px 0 10px; }
+
+  .contestant-row{ background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .contestant-row .row{ margin-bottom:8px; }
+  .assign-label{ display:block; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin:10px 0 6px; }
+  .small-note{ font-size:0.75rem; color:#8B96A6; text-align:center; margin-top:20px; }
+  .status-line{ font-size:0.78rem; color:#B9C3D4; text-align:center; margin:-4px 0 14px; }
+  .empty{ text-align:center; color:var(--ink-soft); padding:20px 0; font-size:0.9rem; }
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--green); color:#fff;
+    padding:12px 20px; border-radius:10px; font-weight:700; font-size:0.9rem; z-index:50; opacity:0; transition:opacity 0.25s; pointer-events:none;
+  }
+  .toast.show{ opacity:1; }
+  .err{ background:#4a1f1f; color:#ffb4b4; padding:10px 14px; border-radius:8px; font-size:0.82rem; margin-bottom:14px; }
+  .event-name{ font-family:'Bebas Neue'; font-size:1.05rem; letter-spacing:0.02em; }
+  .import-box{ background:#F3EFE4; border:1.5px dashed var(--teal); border-radius:10px; padding:14px; margin-bottom:16px; }
+  .import-box input[type=file]{ width:100%; font-size:0.82rem; margin-bottom:0; padding:6px 0; }
+  .import-status{ font-size:0.8rem; font-weight:700; margin-top:8px; }
+  .import-status.ok{ color:var(--green); }
+  .import-status.err{ color:var(--danger); }
+  .pin-explain{ font-size:0.85rem; color:var(--ink-soft); text-align:center; margin-bottom:16px; }
+  .crit-box{ background:#F3EFE4; border-radius:10px; padding:12px; margin-bottom:12px; }
+  .crit-row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .crit-row input[type=text]{ margin-bottom:0; flex:2; }
+  .crit-row input[type=number]{ margin-bottom:0; flex:0 0 70px; }
+  .crit-total{ font-size:0.8rem; font-weight:700; color:var(--ink-soft); text-align:right; margin-top:4px; }
+  .entry-type-row{ margin-bottom:10px; }
+  .folder-tabs{ display:flex; margin:16px 4px 0; }
+  .folder-tab{ padding:10px 20px 8px; font-size:0.85rem; border-radius:10px 10px 0 0; cursor:pointer; user-select:none; }
+  .folder-tab.active{ background:var(--card); color:var(--ink); font-weight:700; position:relative; z-index:2; }
+  .folder-tab.inactive{ background:rgba(251,247,239,0.28); color:#B9C3D4; font-weight:500; margin-left:-2px; }
+  .folder-tabs + .card{ border-top-left-radius:0; }
+  .entry-cell{ word-break:normal; overflow-wrap:normal; white-space:normal; }
+  .entry-cell b{ font-size:0.85rem; }
+  .entry-cell span{ font-size:0.68rem; }
+  .print-only{ display:none; }
+  .print-page{ padding:24px; font-family: Georgia, 'Times New Roman', serif; color:#111; background:#fff; }
+  .print-header{ text-align:center; margin-bottom:16px; }
+  .print-header h1{ font-size:1.3rem; margin:0 0 4px; }
+  .print-header h2{ font-size:1.1rem; margin:0 0 4px; font-weight:700; }
+  .print-header h3{ font-size:1rem; margin:0; font-weight:700; }
+  .print-meta{ font-size:0.85rem; margin-bottom:12px; }
+  .print-table{ width:100%; border-collapse:collapse; margin-bottom:20px; }
+  .print-table th, .print-table td{ border:1px solid #333; padding:6px 8px; font-size:0.85rem; text-align:left; }
+  .print-table th{ background:#eee; }
+  .print-signatures{ margin-top:24px; }
+  .sig-line{ margin-bottom:22px; }
+  .sig-line span{ font-size:0.85rem; display:block; margin-bottom:4px; }
+  .sig-blank{ border-bottom:1px solid #333; height:28px; }
+  .print-criteria-row{ display:flex; justify-content:space-between; font-size:0.85rem; padding:3px 0; border-bottom:1px dotted #999; }
+  .print-blank-line{ border-bottom:1px solid #333; width:60px; display:inline-block; height:16px; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; top:0; left:0; width:100%; display:block !important; }
+    .print-page{ page-break-after: always; }
+    .print-page:last-child{ page-break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="pennants" id="pennants"></div>
+<header>
+  <h1 class="display">Mas Judging</h1>
+  <p>Live Carnival Scoring</p>
+</header>
+
+<div class="container">
+  <div class="modebar">
+    <button id="tabJudge" class="active">Judge</button>
+    <button id="tabOrganizer">Organizer</button>
+  </div>
+
+  <div id="loadingMsg" class="empty">Loading scoresheet&hellip;</div>
+  <div id="app" style="display:none;"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="printArea" class="print-only"></div>
+
+<footer style="text-align:center; padding:24px 16px 40px; color:#8B96A6; font-size:0.72rem; letter-spacing:0.02em;">
+  &copy; 2026 <a href="https://www.immortelleadvisorygroup.com/" target="_blank" rel="noopener" style="color:#8B96A6; text-decoration:underline;">Immortelle Advisory Group</a>. Built by Kirt Morris, Founder &amp; Principal Consultant.
+</footer>
+
+<script>
+/* Mas Judging — Live Carnival Scoring
+   \u00a9 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
+/* ---------- Supabase config ---------- */
+const SUPABASE_URL = 'https://pjqojhtqxljnukwlzekr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ahi2YrsAURh98_DGfM1Hfw_sRw9T34B';
+const TABLE = 'mas_judging_data';
+
+async function sbGet(id){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}&select=data`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  if(!res.ok) throw new Error('Supabase GET failed: ' + res.status);
+  const rows = await res.json();
+  return rows.length ? rows[0].data : null;
+}
+async function sbSet(id, data){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify([{ id, data }])
+  });
+  if(!res.ok) throw new Error('Supabase POST failed: ' + res.status);
+}
+
+/* ---------- Data model ---------- */
+const CRITERIA_TEMPLATE = [
+  {key:'presentation', label:'Presentation / Color', max:20},
+  {key:'craftsmanship', label:'Craftsmanship / Design', max:30},
+  {key:'creativity', label:'Creativity / Authenticity', max:30},
+  {key:'impact', label:'Visual Impact / Portability', max:20},
+];
+const ORG_PIN = '2026';
+
+function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
+
+const DEFAULT_CONFIG = {
+  events: [
+    {
+      id: 'baltimore-one-carnival',
+      name: 'Baltimore One Carnival',
+      judges: ['Judge 1','Judge 2','Judge 3'],
+      categories: [
+        {
+          id: 'adult-female-individual',
+          name: 'Adult Female Individual',
+          entryType: 'individual',
+          criteria: cloneTemplate(),
+          contestants: [
+            {id:'c1', band:'East Coast Limers', masquerader:'Alana Dopson', portrayal:'Pink - The Love Illusion', assignedJudges:['Judge 1','Judge 2','Judge 3']},
+            {id:'c2', band:'East Coast Limers', masquerader:'Selah Thom', portrayal:'The Sand Dancer', assignedJudges:['Judge 1','Judge 2','Judge 3']},
+            {id:'c3', band:'Jackie and Associates', masquerader:'Pearl Wallace', portrayal:'The Song of Rapso', assignedJudges:['Judge 1','Judge 2','Judge 3']},
+            {id:'c4', band:'Dreamerz Carnival', masquerader:'Kierra Charles', portrayal:'Portrayal of Fer-de-lance', assignedJudges:['Judge 1','Judge 2','Judge 3']},
+            {id:'c5', band:'Dreamerz Carnival', masquerader:'Maryze Williams', portrayal:'Portrayal of Scarlet Macaw', assignedJudges:['Judge 1','Judge 2','Judge 3']},
+          ]
+        }
+      ]
+    },
+    { id: 'ny-kiddies-carnival', name: 'NY Carnival — Kiddies (Saturday)', judges: [], categories: [] },
+    { id: 'ny-adult-carnival', name: 'NY Carnival — Adult (Monday)', judges: [], categories: [] },
+  ]
+};
+
+function normalizeConfig(cfg){
+  (cfg.events||[]).forEach(ev=>{
+    ev.judges = (ev.judges||[]).map(j => typeof j === 'string' ? {name:j, realName:j, pin:null} : j);
+    ev.judges.forEach(j=>{ if(typeof j.realName !== 'string' || !j.realName) j.realName = j.name; });
+    (ev.categories||[]).forEach(cat=>{
+      if(cat.entryType !== 'individual' && cat.entryType !== 'group') cat.entryType = 'individual';
+      if(!Array.isArray(cat.criteria) || cat.criteria.length===0) cat.criteria = cloneTemplate();
+      (cat.contestants||[]).forEach(ct=>{
+        if(!Array.isArray(ct.assignedJudges)) ct.assignedJudges = [];
+        if(typeof ct.masquerader !== 'string') ct.masquerader = '';
+      });
+    });
+  });
+  return cfg;
+}
+
+let state = {
+  config: null,
+  scores: {},
+  mode: 'judge',
+  orgUnlocked: false,
+  orgTab: 'setup',
+  eventId: null,
+  judge: null,
+  judgeUnlocked: false,
+  categoryId: null,
+  contestantId: null,
+  draft: {},
+  expandedCats: {},
+  categoryFilter: '',
+};
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function scoreKey(eventId, catId, contestantId, judge){ return [eventId, catId, contestantId, judge].join('|'); }
+function currentEvent(){ return state.config.events.find(e=>e.id===state.eventId) || null; }
+function currentJudgeObj(ev){ return ev ? ev.judges.find(j=>j.name===state.judge) : null; }
+function judgeCategories(ev, judgeName){
+  return ev.categories.filter(c => c.contestants.some(ct => ct.assignedJudges.includes(judgeName)));
+}
+function catMaxTotal(cat){ return cat.criteria.reduce((s,c)=>s+(Number(c.max)||0),0); }
+function contestantTitle(cat, ct){ return cat.entryType==='group' ? (ct.band || '(unnamed band)') : (ct.masquerader || '(unnamed)'); }
+function contestantSubtitle(cat, ct){
+  if(cat.entryType==='group') return ct.portrayal ? `"${ct.portrayal}"` : '';
+  const parts = [];
+  if(ct.band) parts.push(ct.band);
+  if(ct.portrayal) parts.push(`"${ct.portrayal}"`);
+  return parts.join(' \u00b7 ');
+}
+
+function sortContestants(cat, contestants){
+  return [...contestants].sort((a,b)=>{
+    const an = ((cat.entryType==='group' ? a.band : a.masquerader) || '').toLowerCase();
+    const bn = ((cat.entryType==='group' ? b.band : b.masquerader) || '').toLowerCase();
+    return an.localeCompare(bn);
+  });
+}
+
+function detectHeaderRowIndex(aoa){
+  for(let i=0;i<Math.min(aoa.length,20);i++){
+    const row = aoa[i] || [];
+    const nonBlank = row.filter(c=>String(c||'').trim()!=='').length;
+    const hasBand = row.some(c=>/band/i.test(String(c||'')));
+    if(hasBand && nonBlank>=4) return i;
+  }
+  return 0;
+}
+
+function parseCriterionHeader(text){
+  const raw = String(text||'').trim().replace(/\s+/g,' ');
+  const m = /^(.*?)(\d+)\s*$/.exec(raw);
+  if(m){
+    const label = m[1].trim().replace(/[\s,:\-\/]+$/,'');
+    const max = parseInt(m[2],10);
+    return { label: label || raw, max: isNaN(max)?0:max };
+  }
+  return { label: raw, max: 0 };
+}
+
+function mapHeaderColumns(headerRow){
+  const bandSyn = ['band','mas band','band name','name of the band'];
+  const masqSyn = ['masquerader','masquerader name','name of the masquerader','name of masquerader'];
+  const portSyn = ['portrayal','title','portrayal title','name of the portrayal'];
+  let bandIdx=-1, masqIdx=-1, portIdx=-1;
+  const criteriaCols = [];
+  (headerRow||[]).forEach((cellRaw, idx)=>{
+    const cell = String(cellRaw||'').trim();
+    if(!cell) return;
+    const key = cell.toLowerCase().replace(/\s+/g,' ').trim();
+    if(bandSyn.includes(key)){ bandIdx = idx; return; }
+    if(masqSyn.includes(key)){ masqIdx = idx; return; }
+    if(portSyn.includes(key)){ portIdx = idx; return; }
+    if(/total/i.test(cell)) return;
+    const parsed = parseCriterionHeader(cell);
+    if(parsed.label) criteriaCols.push({ idx, label: parsed.label, max: parsed.max });
+  });
+  return { bandIdx, masqIdx, portIdx, criteriaCols };
+}
+
+async function loadAll(){
+  try{
+    let cfg = null;
+    try{ cfg = await sbGet('config'); } catch(e){ console.error(e); }
+    if(!cfg){ cfg = DEFAULT_CONFIG; }
+    cfg = normalizeConfig(cfg);
+    state.config = cfg;
+    await sbSet('config', cfg);
+    if(!state.eventId && cfg.events.length) state.eventId = cfg.events[0].id;
+
+    let sc = null;
+    try{ sc = await sbGet('scores'); } catch(e){ console.error(e); }
+    state.scores = sc || {};
+  }catch(e){
+    console.error('load error', e);
+    state.config = normalizeConfig(DEFAULT_CONFIG);
+    state.eventId = state.config.events[0].id;
+    state.scores = {};
+    showToast('Could not reach the database — check connection', true);
+  }
+  document.getElementById('loadingMsg').style.display='none';
+  document.getElementById('app').style.display='block';
+  renderPennants();
+  render();
+}
+async function saveConfig(){
+  try{ await sbSet('config', state.config); return true; }
+  catch(e){ console.error('save config failed', e); showToast('Save failed — check connection', true); return false; }
+}
+async function saveScores(){
+  try{ await sbSet('scores', state.scores); return true; }
+  catch(e){ console.error('save scores failed', e); showToast('Save failed — check connection, then try again', true); return false; }
+}
+
+async function backupScoresHistory(snapshot){
+  let history = null;
+  try{ history = await sbGet('scores_history'); }catch(e){ /* ignore, best-effort */ }
+  if(!Array.isArray(history)) history = [];
+  history.push({ savedAt: Date.now(), data: snapshot });
+  if(history.length > 10) history = history.slice(history.length - 10);
+  await sbSet('scores_history', history);
+}
+
+async function saveScoreEntry(key, entry){
+  try{
+    let latest = null;
+    try{ latest = await sbGet('scores'); }catch(e){ console.error(e); }
+    if(!latest) latest = {};
+    latest[key] = entry;
+    await sbSet('scores', latest);
+    state.scores = latest;
+    backupScoresHistory(latest).catch(e=>console.error('history backup failed', e));
+    return true;
+  }catch(e){
+    console.error('saveScoreEntry failed', e);
+    showToast('Save failed — check connection, then try again', true);
+    return false;
+  }
+}
+
+async function loadBaltimoreHistorical(){
+  const HIST_NAME = 'Baltimore One Carnival 2026 (Historical)';
+  if(state.config.events.find(e=>e.name===HIST_NAME)){
+    showToast('Historical Baltimore data already loaded');
+    return;
+  }
+  const allJudgeNames = ['Judge 1','Judge 2','Judge 3'];
+  const judges = allJudgeNames.map(name=>({name, pin:null}));
+
+  function mkContestant(band, masquerader, portrayal){
+    return {id:uid(), band, masquerader, portrayal, assignedJudges:[...allJudgeNames]};
+  }
+  function mkGroupEntry(band, portrayal){
+    return {id:uid(), band, masquerader:'', portrayal, assignedJudges:[...allJudgeNames]};
+  }
+
+  const categories = [];
+
+  const afiCat = {id:uid(), name:'Adult Female Individual', entryType:'individual', criteria: cloneTemplate(), contestants: [
+    mkContestant('East Coast Limers','Alana Dopson','Pink - The Love Illusion'),
+    mkContestant('East Coast Limers','Selah Thom','The Sand Dancer'),
+    mkContestant('Jackie and Associates','Pearl Wallace','The Song of Rapso'),
+    mkContestant('Dreamerz Carnival','Kierra Charles','Portrayal of Fer-de-lance'),
+    mkContestant('Dreamerz Carnival','Maryze Williams','Portrayal of Scarlet Macaw'),
+  ]};
+  categories.push(afiCat);
+
+  const queenCat = {id:uid(), name:'Adult Queen', entryType:'individual', criteria: cloneTemplate(), contestants: [
+    mkContestant('East Coast Limers','Joanne Meighoo','The Color Pink - Love at First Sight'),
+    mkContestant('Island Oasis','Lydia Allyene','Goddess of the Glaciers'),
+    mkContestant('Coastal Breeze','Chyna Allen','The Different Cultures of Music'),
+    mkContestant('Dreamerz Carnival','Anisha Gomez','Portrayal of Kaieteur Falls'),
+    mkContestant('DC Jab Jab','','Princess of the Seas & Queen of Bacchanal'),
+  ]};
+  categories.push(queenCat);
+
+  const kingCat = {id:uid(), name:'Adult King', entryType:'individual', criteria: cloneTemplate(), contestants: [
+    mkContestant('East Coast Limers','Sidique Rivers','D Visitor - Illusion or Reality'),
+    mkContestant('East Coast Limers','Antonio "AJ" Meighoo','Desert Mirage'),
+    mkContestant('DC Jab Jab Posse','Tamara Dumas','Captain Bachannal'),
+  ]};
+  categories.push(kingCat);
+
+  categories.push({id:uid(), name:'Junior Queen', entryType:'individual', criteria: cloneTemplate(), contestants: [
+    mkContestant('East Coast Limers','Kylie Felix','Imagine Me')
+  ]});
+
+  categories.push({id:uid(), name:'Junior King', entryType:'individual', criteria: cloneTemplate(), contestants: [
+    mkContestant('East Coast Limers','Kamil Reed','A Lamp in the Dark')
+  ]});
+
+  const smallBandCat = {id:uid(), name:'Adult Bands - Small (Costume)', entryType:'group', criteria: cloneTemplate(), contestants: [
+    mkGroupEntry('We Lil Band','A Lamp in the Dark'),
+    mkGroupEntry('Bmore Love Ting','Rep Yuh Flag Rep'),
+    mkGroupEntry('Shakomba Mooko Jumbies','The Art of Balance and Skills'),
+    mkGroupEntry('Roots and Culture','Amazing Oceanic Creatures'),
+    mkGroupEntry('Dreamerz','Portrayal of Scarlet Macaw'),
+  ]};
+  categories.push(smallBandCat);
+
+  const largeBandCat = {id:uid(), name:'Adult (Large) Band (Costume)', entryType:'group', criteria: cloneTemplate(), contestants: [
+    mkGroupEntry('Costal Breeze','Our Song'),
+    mkGroupEntry('USA Paddle DMV','Grand Masqurade Culture'),
+    mkGroupEntry('East End Paddle Society USA','Mascara Parade'),
+    mkGroupEntry('Island Oasis','Alkebulan'),
+    mkGroupEntry('Richard Carnival','Flow'),
+    mkGroupEntry('East Coast Limers','Illusion of Colors'),
+    mkGroupEntry('Candice Carnival Creations','Battle of the Islands - Trinidad Versus Jamaica'),
+  ]};
+  categories.push(largeBandCat);
+
+  const ncLargeCriteria = [
+    {key:'colorImpact', label:'Color/Impact', max:30},
+    {key:'creativityAuth', label:'Creativity/Authenticity', max:30},
+    {key:'craftsmanship2', label:'Craftsmanship', max:30},
+    {key:'presentation2', label:'Presentation', max:40},
+  ];
+  const ncLargeCat = {id:uid(), name:'Non-Costume Band Large', entryType:'group', criteria: ncLargeCriteria, contestants: [
+    mkGroupEntry('DC Jab Jab Posse','All Aboard'),
+    mkGroupEntry('Zanoble Paint and Powder Band','Dirty Mas'),
+    mkGroupEntry('Color Me Krazy Mas','Carnival is Love: I Cyah Behave Mi Self'),
+    mkGroupEntry('Blue Tantrum Mas','Road Reunion'),
+  ]};
+  categories.push(ncLargeCat);
+
+  const ncSmallCriteria = [
+    {key:'colorImpact', label:'Color/Impact', max:30},
+    {key:'creativity2', label:'Creativity', max:30},
+    {key:'presentation3', label:'Presentation', max:40},
+  ];
+  const ncSmallCat = {id:uid(), name:'Non-Costume Band Small', entryType:'group', criteria: ncSmallCriteria, contestants: [
+    mkGroupEntry('We Lil Band','The Thundercats'),
+    mkGroupEntry('Dreamerz Carnival','Colors of the Caribbean'),
+  ]};
+  categories.push(ncSmallCat);
+
+  const histEvent = {id: uid(), name: HIST_NAME, judges, categories};
+  state.config.events.push(histEvent);
+
+  function findContestant(cat, band, port){
+    return cat.contestants.find(c=>c.band===band && c.portrayal===port);
+  }
+  function setScore(cat, ct, judgeName, values){
+    const key = scoreKey(histEvent.id, cat.id, ct.id, judgeName);
+    state.scores[key] = {...values, judge: judgeName, event: histEvent.id, category: cat.id, contestant: ct.id, submittedAt: Date.now()};
+  }
+
+  setScore(afiCat, findContestant(afiCat,'East Coast Limers','Pink - The Love Illusion'), 'Judge 1', {presentation:14, craftsmanship:16, creativity:15, impact:12});
+  setScore(afiCat, findContestant(afiCat,'East Coast Limers','The Sand Dancer'), 'Judge 1', {presentation:15, craftsmanship:15, creativity:16, impact:15});
+
+  const sbScores = [
+    ['We Lil Band','A Lamp in the Dark', [[15,15,10,10],[22,15,20,14],[25,14,25,14]]],
+    ['Bmore Love Ting','Rep Yuh Flag Rep', [[10,10,10,12],[10,10,12,12],[10,10,10,10]]],
+    ['Shakomba Mooko Jumbies','The Art of Balance and Skills', [[20,16,15,12],[10,16,15,12],[21,10,28,17]]],
+    ['Roots and Culture','Amazing Oceanic Creatures', [[20,15,15,10],[26,15,21,14],[28,18,28,18]]],
+    ['Dreamerz','Portrayal of Scarlet Macaw', [[10,10,10,10],[10,10,10,10],[10,10,10,10]]],
+  ];
+  sbScores.forEach(([band,port,judgeVals])=>{
+    const ct = findContestant(smallBandCat, band, port);
+    judgeVals.forEach((vals, i)=>{
+      setScore(smallBandCat, ct, `Judge ${i+1}`, {presentation:vals[0], craftsmanship:vals[1], creativity:vals[2], impact:vals[3]});
+    });
+  });
+
+  const lbScores = [
+    ['Costal Breeze','Our Song', [[25,18,25,17],[28,16,28,18],[22,15,21,16]]],
+    ['USA Paddle DMV','Grand Masqurade Culture', [[22,16,21,15],[13,15,20,16],[21,17,22,19]]],
+    ['East End Paddle Society USA','Mascara Parade', [[21,15,22,15],[13,15,20,16],[20,18,20,18]]],
+    ['Island Oasis','Alkebulan', [[26,18,27,18],[29,18,28,17],[25,18,26,18]]],
+    ['Richard Carnival','Flow', [[25,17,25,17],[16,15,26,17],[25,19,25,16]]],
+    ['East Coast Limers','Illusion of Colors', [[27,18,28,18],[16,15,26,17],[27,19,28,18]]],
+    ['Candice Carnival Creations','Battle of the Islands - Trinidad Versus Jamaica', [[24,17,24,18],[23,17,24,16],[22,15,15,17]]],
+  ];
+  lbScores.forEach(([band,port,judgeVals])=>{
+    const ct = findContestant(largeBandCat, band, port);
+    judgeVals.forEach((vals, i)=>{
+      setScore(largeBandCat, ct, `Judge ${i+1}`, {presentation:vals[0], craftsmanship:vals[1], creativity:vals[2], impact:vals[3]});
+    });
+  });
+
+  const djjp = findContestant(ncLargeCat, 'DC Jab Jab Posse', 'All Aboard');
+  setScore(ncLargeCat, djjp, 'Judge 1', {colorImpact:18, creativityAuth:14, craftsmanship2:20, presentation2:15});
+  setScore(ncLargeCat, djjp, 'Judge 2', {colorImpact:23, creativityAuth:16, craftsmanship2:21, presentation2:17});
+
+  Object.keys(state.scores).forEach(k=>{
+    if(k.startsWith('baltimore-one-carnival|')) delete state.scores[k];
+  });
+
+  const okC = await saveConfig();
+  const okS = await saveScores();
+  if(okC && okS){
+    showToast('Baltimore 2026 historical data loaded');
+    state.eventId = histEvent.id;
+  } else {
+    showToast('Historical load may be incomplete — check connection', true);
+  }
+  render();
+}
+
+async function loadWIADCAJuniorData(){
+  const ev = currentEvent();
+  if(!ev){ showToast('Select an event first', true); return; }
+  if(!ev.judges || ev.judges.length===0){ showToast('This event has no judges yet \u2014 add them in Setup first', true); return; }
+
+  ev.name = `West Indian American Day Carnival Association \u2014 Junior Carnival`;
+
+  const allJudgeNames = ev.judges.map(j=>j.name);
+
+  function findOrCreateCat(name, entryType, criteriaDefs){
+    let cat = ev.categories.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    if(!cat){
+      cat = { id: uid(), name, entryType, criteria: criteriaDefs.map(c=>({key:uid(), label:c.label, max:c.max})), contestants: [] };
+      ev.categories.push(cat);
+    }
+    return cat;
+  }
+
+  function addContestant(cat, band, masq, port){
+    const isGroup = cat.entryType==='group';
+    const dup = cat.contestants.find(ct=>
+      ct.band.trim().toLowerCase()===band.trim().toLowerCase() &&
+      ct.portrayal.trim().toLowerCase()===port.trim().toLowerCase() &&
+      (isGroup || ct.masquerader.trim().toLowerCase()===masq.trim().toLowerCase())
+    );
+    if(dup){
+      allJudgeNames.forEach(jn=>{ if(!dup.assignedJudges.includes(jn)) dup.assignedJudges.push(jn); });
+      return dup;
+    }
+    const ct = {id:uid(), band, masquerader: isGroup?'':masq, portrayal:port, assignedJudges:[...allJudgeNames]};
+    cat.contestants.push(ct);
+    return ct;
+  }
+
+  const kingCat = findOrCreateCat('Junior King','individual',[
+    {label:'Color & Impact', max:30},{label:'Creativity/ Authenticity', max:20},{label:'Presentation', max:20},{label:'Craftsmanship', max:30}
+  ]);
+  addContestant(kingCat, `D'Midas and Associate`, `Hunter Nanton`, `D'Watcher"`);
+
+  const queenCat = findOrCreateCat('Junior Queen','individual',[
+    {label:'Color & Impact', max:30},{label:'Creativity/ Authenticity', max:30},{label:'Presentation', max:20},{label:'Craftsmanship', max:20}
+  ]);
+  addContestant(queenCat, `D'Midas and Associate`, `Jeni Davidson`, `"D'Madam Botanica"`);
+
+  const bandCriteria = [
+    {label:'Color & Impact', max:30},{label:'Presentation', max:20},{label:'Spirit of Carnival', max:30},{label:'Mas on the Move', max:20}
+  ];
+  const largeCat = findOrCreateCat('Junior Band Large','group', bandCriteria);
+  [
+    [`Branches Mas`,`"Enchanted Tribal Colors"`],
+    [`Sesame Carnival`,`"The Wait is Over"`],
+    [`Rendezvous Mas`,``],
+    [`D'Midas International NYC Inc.`,`"Oasis Garden"`],
+    [`1199 SEIU Social Cultural Committee`,``],
+    [`Seaside Mas`,``],
+    [`Jump Up Production`,``],
+    [`StronJeh International`,``],
+    [`On Your Toes Junior Mas Band`,``],
+    [`The Golden Danceretes`,``],
+    [`Platinum Kids Mas Alongside Kaios Kids`,``],
+    [`Spice Island Shortknee`,`"Shortknee"`],
+    [`Soca Royals Mas`,``],
+    [`Gems of Egypt`,``],
+    [`NYPD-Youth Dancer`,``],
+    [`INSPIRED BY ZOE`,``],
+    [`Kaiso Kids/Platinum Kids Mas`,`"Kilulma-Majesty of the Savannah"/Mel'e" the Circle of Life"`],
+    [`Kaiso Moko Jumbies`,`"The Battle"`],
+    [`Kaiso Moko Jumbies USA`,`"The Battle"`],
+    [`Sherzel Production`,`"Revolution The Rise of Energy"`],
+    [`On Your Toes Junior Mas Band`,`"Out of this World"`],
+    [`Branches Mas Band`,`"Enchanted Tribal Colors"`],
+  ].forEach(([band,port])=> addContestant(largeCat, band, '', port));
+
+  const mediumCriteria = [
+    {label:'Color & Impact', max:30},{label:'Presentation', max:30},{label:'Spirit of Carnival', max:20},{label:'Mas on the Move', max:20}
+  ];
+  findOrCreateCat('Junior Band Medium','group', mediumCriteria);
+  findOrCreateCat('Junior Band Small','group', mediumCriteria);
+
+  const femaleCat = findOrCreateCat('Junior Female Individual','individual', mediumCriteria);
+  [
+    [`Sherzel Kids`,`Milan'Rose Hamilton`,`"Elipse"`],
+    [`Sherzel Kids`,`Sariyah Phillips`,`"Electric"`],
+    [`Sherzel Kids`,`Kelsey Lewis`,`"IGNITE - The Spark That Starts The Revolution"`],
+    [`Sherzel Kids`,`Azariah Abdullah`,`"Majestic"`],
+    [`Sherzel Kids`,`Python Samuel`,`"Chrome"`],
+    [`D'Midas and Associate`,`Carmeila Martin`,`"D'Vision of the Oasis Garden"`],
+    [`D'Midas and Associate`,`Smira Mohammed`,`"D Impress of D'Garden"`],
+    [`D'Midas and Assoicate`,`Carmia Bridgeman`,`"D' Light of D' Oasis Garden"`],
+    [`D'Midas and Associate`,`Tameika Johnson`,`"D' Empress of D'Oasis"`],
+    [`D'Midas and Associate`,`Ayanna George`,`"D' Guardian of the Peacodk Kingdom"`],
+    [`D'Midas and Associate`,`Sara Myton`,`"Princess Skura: Empress of the Chery"`],
+  ].forEach(([band,masq,port])=> addContestant(femaleCat, band, masq, port));
+
+  const maleCat = findOrCreateCat('Junior Male Individual','individual', mediumCriteria);
+  addContestant(maleCat, `D'Midas and Associate`, `Christian`, `"D'Gaudian of the Oasis"`);
+
+  const okC = await saveConfig();
+  if(okC){
+    showToast('WIADCA Junior Carnival data loaded');
+  } else {
+    showToast('Load may be incomplete \u2014 check connection', true);
+  }
+  render();
+}
+
+async function fixBaltimoreCorrections(){
+  const HIST_NAME = 'Baltimore One Carnival 2026 (Historical)';
+  const ev = state.config.events.find(e=>e.name===HIST_NAME);
+  if(!ev){
+    showToast('Historical Baltimore event not found — load it first', true);
+    return;
+  }
+
+  if(!ev.judges.find(j=>j.name==='Judge 4')){
+    ev.judges.push({name:'Judge 4', pin:null});
+  }
+
+  const afiCat = ev.categories.find(c=>c.name==='Adult Female Individual');
+  if(afiCat){
+    const findCt = (band, port) => afiCat.contestants.find(c=>c.band===band && c.portrayal===port);
+    const alana = findCt('East Coast Limers','Pink - The Love Illusion');
+    const selah = findCt('East Coast Limers','The Sand Dancer');
+    [alana, selah].forEach(ct=>{
+      if(ct && !ct.assignedJudges.includes('Judge 4')) ct.assignedJudges.push('Judge 4');
+    });
+    const setSingle = (ct, judgeName, total) => {
+      if(!ct) return;
+      const key = scoreKey(ev.id, afiCat.id, ct.id, judgeName);
+      state.scores[key] = {presentation: total, craftsmanship:0, creativity:0, impact:0, totalOnly:true, judge:judgeName, event:ev.id, category:afiCat.id, contestant:ct.id, submittedAt:Date.now()};
+    };
+    setSingle(alana,'Judge 1',12); setSingle(alana,'Judge 2',16); setSingle(alana,'Judge 3',15); setSingle(alana,'Judge 4',14);
+    setSingle(selah,'Judge 1',15); setSingle(selah,'Judge 2',15); setSingle(selah,'Judge 3',16); setSingle(selah,'Judge 4',15);
+    const pearl = findCt('Jackie and Associates','The Song of Rapso');
+    if(pearl){
+      ['Judge 1','Judge 2','Judge 3','Judge 4'].forEach(j=>{
+        delete state.scores[scoreKey(ev.id, afiCat.id, pearl.id, j)];
+      });
+    }
+  }
+
+  const nclCat = ev.categories.find(c=>c.name==='Non-Costume Band Large');
+  if(nclCat){
+    const findCt2 = (band, port) => nclCat.contestants.find(c=>c.band===band && c.portrayal===port);
+    const djjp = findCt2('DC Jab Jab Posse','All Aboard');
+    const zan = findCt2('Zanoble Paint and Powder Band','Dirty Mas');
+    const cmk = findCt2('Color Me Krazy Mas','Carnival is Love: I Cyah Behave Mi Self');
+    const btm = findCt2('Blue Tantrum Mas','Road Reunion');
+    const setSingleNC = (ct, judgeName, total) => {
+      if(!ct) return;
+      const key = scoreKey(ev.id, nclCat.id, ct.id, judgeName);
+      state.scores[key] = {colorImpact: total, creativityAuth:0, craftsmanship2:0, presentation2:0, totalOnly:true, judge:judgeName, event:ev.id, category:nclCat.id, contestant:ct.id, submittedAt:Date.now()};
+    };
+    setSingleNC(djjp,'Judge 1',63); setSingleNC(djjp,'Judge 2',67); setSingleNC(djjp,'Judge 3',77);
+    setSingleNC(zan,'Judge 1',54); setSingleNC(zan,'Judge 2',73); setSingleNC(zan,'Judge 3',71);
+    setSingleNC(cmk,'Judge 1',52); setSingleNC(cmk,'Judge 2',69); setSingleNC(cmk,'Judge 3',76);
+    setSingleNC(btm,'Judge 1',64); setSingleNC(btm,'Judge 2',68); setSingleNC(btm,'Judge 3',81);
+  }
+
+  const okC = await saveConfig();
+  const okS = await saveScores();
+  if(okC && okS) showToast('Baltimore corrections applied');
+  else showToast('Corrections may be incomplete — check connection', true);
+  render();
+}
+
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isErr ? 'var(--danger)' : 'var(--green)';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function renderPennants(){
+  const el = document.getElementById('pennants');
+  el.innerHTML = Array.from({length:14}).map(()=>'<span></span>').join('');
+}
+
+document.getElementById('tabJudge').onclick = ()=>{ state.mode='judge'; setActiveTab(); render(); };
+document.getElementById('tabOrganizer').onclick = ()=>{ state.mode='organizer'; setActiveTab(); render(); };
+function setActiveTab(){
+  document.getElementById('tabJudge').classList.toggle('active', state.mode==='judge');
+  document.getElementById('tabOrganizer').classList.toggle('active', state.mode==='organizer');
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(state.mode === 'judge'){
+    app.innerHTML = renderJudgeMode();
+    attachJudgeHandlers();
+  } else {
+    if(!state.orgUnlocked){
+      app.innerHTML = renderPinGate();
+      attachPinHandlers();
+    } else {
+      app.innerHTML = renderOrganizer();
+      attachOrganizerHandlers();
+    }
+  }
+}
+
+/* ---------- EVENT PICKER (shared) ---------- */
+function renderEventPicker(isOrganizer){
+  const cfg = state.config;
+  if(!isOrganizer && cfg.events.length===0) return '';
+
+  let html = '<div class="card"><label>Event</label>';
+  if(cfg.events.length===0){
+    html += `<input type="text" id="newEventNameInline" placeholder="New event name (e.g. NY Carnival — J'ouvert)">
+      <button class="btn btn-primary btn-small" id="createEventInlineBtn">Create event</button>`;
+    if(!cfg.events.find(e=>e.name==='Baltimore One Carnival 2026 (Historical)')){
+      html += '<button class="btn btn-outline btn-small" id="loadBaltimoreHistBtn" style="margin-top:10px; width:100%;">Load Baltimore 2026 historical data from spreadsheet</button>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  html += '<select id="eventSelect">';
+  cfg.events.forEach(ev=>{
+    html += `<option value="${ev.id}" ${state.eventId===ev.id?'selected':''}>${escapeHtml(ev.name)}</option>`;
+  });
+  if(isOrganizer) html += `<option value="__add__">+ Add new event&hellip;</option>`;
+  html += '</select>';
+
+  if(isOrganizer){
+    html += `<input type="text" id="newEventNameInline" placeholder="New event name (e.g. NY Carnival — J'ouvert)" style="display:none; margin-top:0;">
+      <button class="btn btn-primary btn-small" id="createEventInlineBtn" style="display:none; margin-top:8px;">Create event</button>`;
+    html += `<button class="btn btn-danger btn-small" id="removeCurrentEventBtn" style="margin-top:10px; width:100%;">Remove this event</button>`;
+    if(!cfg.events.find(e=>e.name==='Baltimore One Carnival 2026 (Historical)')){
+      html += '<button class="btn btn-outline btn-small" id="loadBaltimoreHistBtn" style="margin-top:10px; width:100%;">Load Baltimore 2026 historical data from spreadsheet</button>';
+    } else {
+      html += '<button class="btn btn-outline btn-small" id="fixBaltimoreBtn" style="margin-top:10px; width:100%;">Apply Baltimore score corrections (Adult Female Individual + Non-Costume Band Large)</button>';
+    }
+    html += '<button class="btn btn-outline btn-small" id="loadWiadcaBtn" style="margin-top:10px; width:100%;">Load WIADCA Junior Carnival data into this event</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ---------- JUDGE MODE ---------- */
+function renderJudgeMode(){
+  const cfg = state.config;
+  let html = renderEventPicker(false);
+  const ev = currentEvent();
+  if(!ev) return html + '<div class="empty">No events yet. Ask the organizer to add one.</div>';
+
+  html += '<div class="card">';
+  html += '<label>Your name</label>';
+  if(ev.judges.length === 0){
+    html += '<div class="empty">No judges set up yet for this event. Ask the organizer to add you in Setup.</div>';
+    html += '</div>';
+    return html;
+  }
+  html += '<select id="judgeSelect">';
+  html += '<option value="">Select your judge number&hellip;</option>';
+  ev.judges.forEach(j=>{
+    html += `<option value="${escapeAttr(j.name)}" ${state.judge===j.name?'selected':''}>${escapeHtml(j.name)}</option>`;
+  });
+  html += '</select>';
+  html += '</div>';
+
+  if(!state.judge) return html + '<div class="empty">Pick or add your name to start scoring.</div>';
+
+  const judgeObj = currentJudgeObj(ev);
+  if(!judgeObj) return html + '<div class="empty">That judge is no longer on this event.</div>';
+
+  if(judgeObj.pin === null || judgeObj.pin === undefined){
+    html += `<div class="card">
+      <div class="section-title" style="color:var(--ink);">Set your PIN</div>
+      <div class="pin-explain">Create a 4-digit PIN for <b>${escapeHtml(judgeObj.name)}</b>. You'll enter it each time you pick this name, so no one accidentally scores as you.</div>
+      <input type="tel" inputmode="numeric" maxlength="4" id="pinSetInput" placeholder="4-digit PIN" style="text-align:center; letter-spacing:0.4em; font-size:1.3rem;">
+      <button class="btn btn-primary" id="pinSetBtn">Set PIN</button>
+      <div id="pinSetErr" class="err" style="display:none; margin-top:10px;">Enter exactly 4 digits.</div>
+    </div>`;
+    return html;
+  }
+
+  if(!state.judgeUnlocked){
+    html += `<div class="card">
+      <div class="section-title" style="color:var(--ink);">Enter your PIN</div>
+      <div class="pin-explain">Scoring as <b>${escapeHtml(judgeObj.name)}</b>.</div>
+      <input type="tel" inputmode="numeric" maxlength="4" id="pinCheckInput" placeholder="4-digit PIN" style="text-align:center; letter-spacing:0.4em; font-size:1.3rem;">
+      <button class="btn btn-primary" id="pinCheckBtn">Unlock</button>
+      <div id="pinCheckErr" class="err" style="display:none; margin-top:10px;">Wrong PIN. Ask the organizer to reset it if you forgot.</div>
+    </div>`;
+    return html;
+  }
+
+  const myCats = judgeCategories(ev, state.judge);
+  if(myCats.length === 0){
+    return html + '<div class="empty">You have not been assigned to any categories yet. Ask the organizer to assign you in Setup.</div>';
+  }
+
+  html += '<div class="card">';
+  html += '<label>Category</label>';
+  html += '<select id="categorySelect">';
+  html += '<option value="">Select category&hellip;</option>';
+  myCats.forEach(c=>{
+    html += `<option value="${c.id}" ${state.categoryId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`;
+  });
+  html += '</select>';
+  html += '</div>';
+
+  if(!state.categoryId) return html + '<div class="empty">Choose a category to see your assigned contestants.</div>';
+
+  const cat = myCats.find(c=>c.id===state.categoryId);
+  if(!cat) return html + '<div class="empty">Choose a category to see your assigned contestants.</div>';
+
+  const myContestants = sortContestants(cat, cat.contestants.filter(ct => ct.assignedJudges.includes(state.judge)));
+  if(myContestants.length===0) return html + '<div class="empty">No contestants assigned to you in this category yet.</div>';
+
+  if(state.contestantId){
+    const contestant = myContestants.find(c=>c.id===state.contestantId);
+    if(contestant) return html + renderScoringCard(ev, cat, contestant);
+  }
+
+  html += '<div class="section-title">Your Contestants</div><div class="contestant-list">';
+  myContestants.forEach(ct=>{
+    const key = scoreKey(ev.id, cat.id, ct.id, state.judge);
+    const done = !!state.scores[key];
+    html += `<div class="contestant-item" data-contestant="${ct.id}">
+      <div class="info"><b>${escapeHtml(contestantTitle(cat,ct))}</b><span>${escapeHtml(contestantSubtitle(cat,ct))}</span></div>
+      <span class="badge ${done?'done':'pending'}">${done?'Scored':'Pending'}</span>
+    </div>`;
+  });
+  html += '</div>';
+  html += `<button class="btn btn-outline-light btn-small" id="printMyScoresBtn" style="width:100%; margin-top:12px;">Print my scores</button>`;
+  return html;
+}
+
+function renderScoringCard(ev, cat, contestant){
+  const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+  const existing = state.scores[key];
+  if(!state.draft[key]){
+    state.draft[key] = existing ? {...existing} : {};
+    cat.criteria.forEach(c=>{ if(state.draft[key][c.key] === undefined) state.draft[key][c.key] = 0; });
+  }
+  const draft = state.draft[key];
+  const maxTotal = catMaxTotal(cat);
+  const total = cat.criteria.reduce((s,c)=>s+(draft[c.key]||0),0);
+
+  let html = `<button class="btn btn-outline btn-small" id="backToList" style="margin-bottom:12px;">&larr; Back to contestants</button>`;
+  html += `<div class="card ticket">`;
+  html += `<div class="event-name" style="color:var(--ink-soft); margin-bottom:4px;">${escapeHtml(ev.name)} &middot; ${escapeHtml(cat.name)}</div>`;
+  html += `<div style="margin-bottom:10px;">
+      <b style="font-size:1.15rem;">${escapeHtml(contestantTitle(cat,contestant))}</b><br>
+      <span style="color:var(--ink-soft); font-size:0.85rem;">${escapeHtml(contestantSubtitle(cat,contestant))}</span>
+    </div>`;
+
+  cat.criteria.forEach(c=>{
+    const val = draft[c.key] || 0;
+    html += `<div class="criterion">
+      <div class="top"><span class="name">${escapeHtml(c.label||'(unnamed criterion)')}</span></div>
+      <div class="score-input-row">
+        <input type="number" inputmode="numeric" min="0" max="${c.max}" value="${val}" data-crit="${c.key}" class="score-input">
+        <span class="score-max">out of ${c.max}</span>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="total-strip"><span>Total</span><span class="num"><span id="liveTotal">${total}</span> <span style="font-size:1rem;">/ ${maxTotal}</span></span></div>`;
+  html += `<button class="btn btn-primary" id="submitScore">${existing?'Update score':'Submit score'}</button>`;
+  html += `</div>`;
+  return html;
+}
+
+function attachJudgeHandlers(){
+  const evSel = document.getElementById('eventSelect');
+  if(evSel) evSel.onchange = (e)=>{ state.eventId = e.target.value; state.judge=null; state.judgeUnlocked=false; state.categoryId=null; state.contestantId=null; render(); };
+
+  const jSel = document.getElementById('judgeSelect');
+  if(jSel) jSel.onchange = (e)=>{ state.judge = e.target.value || null; state.judgeUnlocked=false; state.categoryId=null; state.contestantId=null; render(); };
+
+  const pinSetBtn = document.getElementById('pinSetBtn');
+  if(pinSetBtn) pinSetBtn.onclick = async ()=>{
+    const val = document.getElementById('pinSetInput').value.trim();
+    const errEl = document.getElementById('pinSetErr');
+    if(!/^\d{4}$/.test(val)){ errEl.style.display='block'; return; }
+    const ev = currentEvent();
+    const judgeObj = currentJudgeObj(ev);
+    judgeObj.pin = val;
+    await saveConfig();
+    state.judgeUnlocked = true;
+    render();
+  };
+
+  const pinCheckBtn = document.getElementById('pinCheckBtn');
+  if(pinCheckBtn) pinCheckBtn.onclick = ()=>{
+    const val = document.getElementById('pinCheckInput').value.trim();
+    const ev = currentEvent();
+    const judgeObj = currentJudgeObj(ev);
+    const errEl = document.getElementById('pinCheckErr');
+    if(val === judgeObj.pin){ state.judgeUnlocked = true; render(); }
+    else { errEl.style.display='block'; }
+  };
+
+  const catSel = document.getElementById('categorySelect');
+  if(catSel) catSel.onchange = (e)=>{ state.categoryId = e.target.value || null; state.contestantId=null; render(); };
+
+  document.querySelectorAll('.contestant-item').forEach(el=>{
+    el.onclick = ()=>{ state.contestantId = el.getAttribute('data-contestant'); render(); };
+  });
+
+  const back = document.getElementById('backToList');
+  if(back) back.onclick = ()=>{ state.contestantId=null; render(); };
+
+  const printMyScoresBtn = document.getElementById('printMyScoresBtn');
+  if(printMyScoresBtn) printMyScoresBtn.onclick = ()=>{
+    const ev = currentEvent();
+    const cat = ev.categories.find(c=>c.id===state.categoryId);
+    if(!cat) return;
+    printMyScores(ev, cat, state.judge);
+  };
+
+  document.querySelectorAll('input.score-input[data-crit]').forEach(el=>{
+    const updateLiveTotal = (cat, key)=>{
+      const total = cat.criteria.reduce((s,c)=>s+(state.draft[key][c.key]||0),0);
+      const totalEl = document.getElementById('liveTotal');
+      if(totalEl) totalEl.textContent = total;
+    };
+    el.oninput = (e)=>{
+      const ev = currentEvent();
+      const cat = ev.categories.find(c=>c.id===state.categoryId);
+      const contestant = cat.contestants.find(c=>c.id===state.contestantId);
+      const critKey = e.target.getAttribute('data-crit');
+      let v = parseInt(e.target.value,10);
+      if(isNaN(v)) v = 0;
+      const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+      state.draft[key][critKey] = v;
+      updateLiveTotal(cat, key);
+    };
+    el.onblur = (e)=>{
+      const ev = currentEvent();
+      const cat = ev.categories.find(c=>c.id===state.categoryId);
+      const contestant = cat.contestants.find(c=>c.id===state.contestantId);
+      const critKey = e.target.getAttribute('data-crit');
+      const crit = cat.criteria.find(c=>c.key===critKey);
+      let v = parseInt(e.target.value,10);
+      if(isNaN(v) || v<0) v = 0;
+      if(crit && v>crit.max) v = crit.max;
+      e.target.value = v;
+      const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+      state.draft[key][critKey] = v;
+      updateLiveTotal(cat, key);
+    };
+  });
+
+  const submitBtn = document.getElementById('submitScore');
+  if(submitBtn) submitBtn.onclick = async ()=>{
+    const ev = currentEvent();
+    const cat = ev.categories.find(c=>c.id===state.categoryId);
+    const contestant = cat.contestants.find(c=>c.id===state.contestantId);
+    const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+    const entry = {...state.draft[key], judge: state.judge, event: ev.id, category: cat.id, contestant: contestant.id, submittedAt: Date.now()};
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving\u2026';
+    const ok = await saveScoreEntry(key, entry);
+    if(ok){
+      showToast('Score saved for ' + contestantTitle(cat, contestant));
+      state.contestantId = null;
+      render();
+    } else {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit score';
+    }
+  };
+}
+
+/* ---------- ORGANIZER MODE ---------- */
+function renderPinGate(){
+  return `<div class="pin-wrap">
+    <div class="section-title" style="color:var(--card);">Organizer access</div>
+    <input type="text" id="pinInput" placeholder="PIN" inputmode="numeric" maxlength="8" style="max-width:180px; margin:0 auto 12px;">
+    <br><button class="btn btn-primary" id="pinSubmit" style="max-width:180px;">Unlock</button>
+    <div id="pinErr" class="err" style="display:none; max-width:260px; margin:14px auto 0;">Incorrect PIN. Ask Kirt for the organizer PIN.</div>
+  </div>`;
+}
+function attachPinHandlers(){
+  document.getElementById('pinSubmit').onclick = ()=>{
+    const val = document.getElementById('pinInput').value.trim();
+    if(val === ORG_PIN){ state.orgUnlocked = true; render(); }
+    else { document.getElementById('pinErr').style.display='block'; }
+  };
+}
+
+function renderOrganizer(){
+  let html = renderEventPicker(true);
+  const ev = currentEvent();
+  if(!ev) return html;
+
+  html += '<div class="folder-tabs">';
+  html += `<span class="folder-tab ${state.orgTab==='setup'?'active':'inactive'}" data-org-tab="setup">Setup</span>`;
+  html += `<span class="folder-tab ${state.orgTab==='tally'?'active':'inactive'}" data-org-tab="tally">Live Tally</span>`;
+  html += `<span class="folder-tab ${state.orgTab==='detail'?'active':'inactive'}" data-org-tab="detail">Judge Detail</span>`;
+  html += '</div>';
+
+  if(state.orgTab === 'tally') html += renderTally(ev);
+  else if(state.orgTab === 'detail') html += renderJudgeDetail(ev);
+  else html += renderSetup(ev);
+  return html;
+}
+
+function renderSetup(ev){
+  let html = '';
+  html += '<div class="card"><div class="section-title" style="color:var(--ink); margin:0 0 12px;">Judges — ' + escapeHtml(ev.name) + '</div><div class="chip-row">';
+  ev.judges.forEach(j=>{
+    const hasPin = j.pin !== null && j.pin !== undefined;
+    html += `<span class="chip"><b>${escapeHtml(j.name)}</b> <span style="color:var(--ink-soft); font-weight:400;">(${escapeHtml(j.realName||j.name)})</span>
+      <span class="pinflag ${hasPin?'set':'unset'}">${hasPin?'PIN set':'No PIN'}</span>
+      ${hasPin?`<button class="reset" data-reset-pin="${escapeAttr(j.name)}">reset</button>`:''}
+      <button data-remove-judge="${escapeAttr(j.name)}">&times;</button></span>`;
+  });
+  html += '</div><div class="row"><input type="text" id="setupNewJudge" placeholder="Add judge (real name, kept private)"><button class="btn btn-outline btn-small" id="setupAddJudge" style="flex:0 0 auto;">Add</button></div>'
+    + '<div class="small-note" style="margin-top:8px; text-align:left;">Judges appear here by real name so you can keep track of who\'s who. Everywhere else in the app — Live Tally, Judge Detail, printed sheets, and the Judge tab — they only ever show as "Judge 1", "Judge 2", etc. Tell each judge their number privately so they can find their slot under the Judge tab.</div>'
+    + '</div>';
+
+  html += '<button class="btn btn-outline-light btn-small" id="printBlankSheetsBtn" style="width:100%; margin-bottom:16px;">Print blank scoring sheets (all judges)</button>';
+
+  html += '<div class="section-title">Categories — ' + escapeHtml(ev.name) + '</div>';
+  html += '<div class="card"><div class="row"><input type="text" id="setupNewCategory" placeholder="New category name"><button class="btn btn-outline btn-small" id="setupAddCategory" style="flex:0 0 auto;">Add</button></div></div>';
+
+  html += `<div class="import-box">
+      <label>Import contestants into a category</label>
+      <select id="importTargetCategory">
+        <option value="">Choose a category&hellip;</option>
+        ${ev.categories.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+        <option value="__new__">+ Create new category&hellip;</option>
+      </select>
+      <input type="text" id="importNewCategoryName" placeholder="New category name" style="display:none;">
+      <input type="file" accept=".xlsx,.xls,.csv" id="eventImportFile">
+      <div class="small-note" style="margin-top:8px; text-align:left;">First row = headers. Columns matched by name: <b>Band</b>, <b>Masquerader</b>, <b>Portrayal</b> (any order, case-insensitive). For Group-type categories (bands, steelbands, DJ, etc.) Masquerader is ignored and Band is the identifying field. Any "Category" or "Judge Name" column in the file is ignored — every row goes into the category you chose above. Duplicate rows for the same contestant (e.g. one row per judge) are automatically collapsed. Adds to the list, doesn't replace it.</div>
+      <div class="import-status" id="eventImportStatus"></div>
+    </div>`;
+
+  html += `<div class="import-box">
+      <label>Import a full workbook (one category per sheet)</label>
+      <input type="file" accept=".xlsx,.xls" id="workbookImportFile">
+      <div id="workbookSheetWrap" style="display:none; margin-top:10px;">
+        <label>Sheet to import</label>
+        <select id="workbookSheetSelect"></select>
+        <button class="btn btn-outline btn-small" id="workbookSheetGoBtn" style="width:100%; margin-top:8px;">Import this sheet as its own category</button>
+      </div>
+      <div class="small-note" style="margin-top:8px; text-align:left;">Upload a workbook with multiple tabs (like a full judging packet). Pick a tab and this creates (or reuses) a category named after that tab, automatically finds the header row even with title rows above it, detects Individual vs Group based on whether there's a Masquerader column, and pre-fills the judging criteria and points from the column headers (e.g. "Color &amp; Impact 30"). Repeat once per tab you want to bring in.</div>
+      <div class="import-status" id="workbookImportStatus"></div>
+    </div>`;
+
+  html += `<div class="card"><label>Filter categories</label><input type="text" id="categoryFilterInput" placeholder="Type to filter by name..." value="${escapeAttr(state.categoryFilter||'')}"></div>`;
+
+  html += `<div id="categoriesListContainer">${renderCategoryCards(ev)}</div>`;
+
+  return html;
+}
+
+function renderCategoryCards(ev){
+  const filter = (state.categoryFilter||'').trim().toLowerCase();
+  const cats = ev.categories.filter(cat => !filter || cat.name.toLowerCase().includes(filter));
+  if(ev.categories.length===0) return '<div class="empty">No categories yet. Add one above.</div>';
+  if(cats.length===0) return '<div class="empty">No categories match your filter.</div>';
+
+  let html = '';
+  cats.forEach(cat=>{
+    const maxTotal = catMaxTotal(cat);
+    const expanded = !!state.expandedCats[cat.id];
+    html += `<div class="card">`;
+    html += `<div data-cat-toggle="${cat.id}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none;">
+        <div>
+          <b>${escapeHtml(cat.name)}</b>
+          <div style="font-size:0.75rem; color:var(--ink-soft); margin-top:2px;">${cat.entryType==='group'?'Group':'Individual'} &middot; ${cat.contestants.length} contestant${cat.contestants.length!==1?'s':''} &middot; ${maxTotal} pts</div>
+        </div>
+        <span style="font-size:1.1rem; color:var(--ink-soft);">${expanded?'&#9662;':'&#9656;'}</span>
+      </div>`;
+
+    if(expanded){
+      html += `<div style="margin-top:14px;">`;
+      html += `<div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+          <button class="btn-danger" data-remove-cat="${cat.id}">Remove category</button>
+        </div>`;
+
+      html += `<div class="entry-type-row"><label>Entry type</label><div class="chip-row" style="margin-bottom:0;">
+          <span class="chip etype ${cat.entryType==='individual'?'on':''}" data-etype="individual" data-cat="${cat.id}">Individual (Band + Masquerader + Portrayal)</span>
+          <span class="chip etype ${cat.entryType==='group'?'on':''}" data-etype="group" data-cat="${cat.id}">Group (Band + Portrayal only)</span>
+        </div></div>`;
+
+      html += `<div class="crit-box">
+        <label>Judging criteria</label>`;
+      cat.criteria.forEach(c=>{
+        html += `<div class="crit-row">
+          <input type="text" value="${escapeAttr(c.label)}" placeholder="Criterion name" data-crit-field="label" data-cat="${cat.id}" data-crit="${c.key}">
+          <input type="number" min="0" value="${c.max}" placeholder="Pts" data-crit-field="max" data-cat="${cat.id}" data-crit="${c.key}">
+          <button class="btn-danger" data-crit-remove data-cat="${cat.id}" data-crit="${c.key}" style="padding:6px 10px;">&times;</button>
+        </div>`;
+      });
+      html += `<button class="btn btn-outline btn-small" data-crit-add="${cat.id}">+ Add criterion</button>
+        <div class="crit-total">Total: ${maxTotal} pts</div>
+      </div>`;
+
+      sortContestants(cat, cat.contestants).forEach(ct=>{
+        html += `<div class="contestant-row">
+          <div class="row"><div><label>Band</label><input type="text" value="${escapeAttr(ct.band)}" data-field="band" data-cat="${cat.id}" data-contestant="${ct.id}"></div></div>`;
+        if(cat.entryType === 'individual'){
+          html += `<div class="row"><div><label>Masquerader</label><input type="text" value="${escapeAttr(ct.masquerader)}" data-field="masquerader" data-cat="${cat.id}" data-contestant="${ct.id}"></div></div>`;
+        }
+        html += `<div class="row"><div><label>${cat.entryType==='group'?'Portrayal / Presentation Title':'Portrayal'}</label><input type="text" value="${escapeAttr(ct.portrayal)}" data-field="portrayal" data-cat="${cat.id}" data-contestant="${ct.id}"></div></div>
+          <div class="assign-label">Assigned judges</div>
+          <div class="chip-row" style="margin-bottom:8px;">`;
+        if(ev.judges.length===0){
+          html += `<span style="font-size:0.8rem; color:var(--ink-soft);">Add judges above first.</span>`;
+        }
+        ev.judges.forEach(j=>{
+          const on = ct.assignedJudges.includes(j.name);
+          html += `<span class="chip assign ${on?'on':'off'}" data-assign-toggle data-cat="${cat.id}" data-contestant="${ct.id}" data-judge="${escapeAttr(j.name)}">${escapeHtml(j.name)}</span>`;
+        });
+        html += `</div>
+          <button class="btn-danger" data-remove-contestant="${ct.id}" data-cat2="${cat.id}">Remove contestant</button>
+        </div>`;
+      });
+      html += `<button class="btn btn-outline btn-small" data-add-contestant="${cat.id}">+ Add contestant</button>`;
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  return html;
+}
+
+function shortJudgeLabel(name){
+  const m = /^Judge\s+(\d+)$/i.exec((name||'').trim());
+  return m ? ('J'+m[1]) : name;
+}
+
+function renderTally(ev){
+  if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one below.</div>';
+
+  let html = '<div class="card"><label>Category</label><select id="tallyCategorySelect">';
+  ev.categories.forEach(c=>{
+    html += `<option value="${c.id}" ${state.categoryId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`;
+  });
+  html += '</select></div>';
+
+  const catId = state.categoryId || ev.categories[0].id;
+  const cat = ev.categories.find(c=>c.id===catId);
+  if(!cat) return html;
+
+  html += `<div class="row" style="margin-bottom:12px;">
+      <button class="btn btn-outline-light btn-small" id="printSignoffBtn">Print for signatures</button>
+      <button class="btn btn-outline-light btn-small" id="printAllSignoffBtn">Print all categories</button>
+    </div>`;
+
+  const catJudges = ev.judges.filter(j => cat.contestants.some(ct => ct.assignedJudges.includes(j.name)));
+
+  const rows = cat.contestants.map(ct=>{
+    const perJudge = catJudges.map(j=>{
+      if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
+      const key = scoreKey(ev.id, cat.id, ct.id, j.name);
+      const s = state.scores[key];
+      if(!s) return {status:'pending'};
+      return {status:'scored', value: cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0)};
+    });
+    const submitted = perJudge.filter(p=>p.status==='scored').map(p=>p.value);
+    const total = submitted.length ? submitted.reduce((a,b)=>a+b,0) : null;
+    return { contestant: ct, perJudge, total };
+  });
+
+  rows.sort((a,b)=>{
+    if(a.total===null && b.total===null) return 0;
+    if(a.total===null) return 1;
+    if(b.total===null) return -1;
+    return b.total - a.total;
+  });
+
+  html += `<div class="status-line">${catJudges.length} of ${ev.judges.length} judge${ev.judges.length!==1?'s':''} assigned to this category &middot; columns marked &middot; mean not assigned to that contestant</div>`;
+
+  html += '<div class="card"><table><thead><tr><th style="width:26px;">Pos.</th><th>Entry</th>';
+  catJudges.forEach(j=>{ html += `<th style="width:32px;">${escapeHtml(shortJudgeLabel(j.name))}</th>`; });
+  html += '<th style="width:42px;">Total</th></tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    const place = r.total!==null ? (i+1) : '&mdash;';
+    html += `<tr class="${i===0 && r.total!==null?'rank1':''}">
+      <td class="num">${place}</td>
+      <td class="entry-cell"><b>${escapeHtml(contestantTitle(cat,r.contestant))}</b><br><span style="color:var(--ink-soft);">${escapeHtml(contestantSubtitle(cat,r.contestant))}</span></td>`;
+    r.perJudge.forEach(p=>{
+      if(p.status==='na') html += `<td class="num muted">&middot;</td>`;
+      else if(p.status==='pending') html += `<td class="num">&mdash;</td>`;
+      else html += `<td class="num">${p.value}</td>`;
+    });
+    html += `<td class="num">${r.total===null?'&mdash;':r.total}</td></tr>`;
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function renderJudgeDetail(ev){
+  if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one in Setup.</div>';
+
+  let html = '<div class="card"><label>Category</label><select id="detailCategorySelect">';
+  ev.categories.forEach(c=>{
+    html += `<option value="${c.id}" ${state.categoryId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`;
+  });
+  html += '</select></div>';
+
+  const catId = state.categoryId || ev.categories[0].id;
+  const cat = ev.categories.find(c=>c.id===catId);
+  if(!cat) return html;
+
+  if(cat.contestants.length===0) return html + '<div class="empty">No entries in this category yet.</div>';
+
+  sortContestants(cat, cat.contestants).forEach(ct=>{
+    html += `<div class="card"><b>${escapeHtml(contestantTitle(cat,ct))}</b>`;
+    if(contestantSubtitle(cat,ct)) html += `<div style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:10px;">${escapeHtml(contestantSubtitle(cat,ct))}</div>`;
+    if(ct.assignedJudges.length===0){
+      html += `<div class="small-note" style="margin-top:8px;">No judges assigned.</div>`;
+    } else {
+      ct.assignedJudges.forEach(judgeName=>{
+        const key = scoreKey(ev.id, cat.id, ct.id, judgeName);
+        const s = state.scores[key];
+        html += `<div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">`;
+        html += `<div style="font-weight:700; font-size:0.85rem; margin-bottom:6px;">${escapeHtml(judgeName)}</div>`;
+        if(!s){
+          html += `<div style="color:var(--ink-soft); font-size:0.82rem;">Not yet scored</div>`;
+        } else if(s.totalOnly){
+          const total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
+          html += `<div style="font-size:0.9rem;">Total: <b>${total}</b> <span style="color:var(--ink-soft); font-size:0.78rem;">(breakdown not recorded for this entry)</span></div>`;
+        } else {
+          cat.criteria.forEach(c=>{
+            html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:2px 0;"><span>${escapeHtml(c.label||'(unnamed)')}</span><span>${s[c.key]||0} / ${c.max}</span></div>`;
+          });
+          const total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
+          html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:700; margin-top:4px; padding-top:4px; border-top:1px solid var(--line);"><span>Total</span><span>${total} / ${catMaxTotal(cat)}</span></div>`;
+        }
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  return html;
+}
+
+function buildBlankSheetPageHtml(ev, cat, judgeName){
+  const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
+  if(contestants.length===0) return '';
+  let html = `<div class="print-page">`;
+  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Blank Scoring Sheet</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
+  html += `<div class="print-meta">Judge: <b>${escapeHtml(judgeName)}</b> &nbsp;&nbsp; Date: <span class="print-blank-line" style="width:120px;"></span></div>`;
+  contestants.forEach(ct=>{
+    html += `<div style="margin-bottom:18px; border:1px solid #333; padding:10px;">`;
+    html += `<div style="font-weight:700; margin-bottom:6px;">${escapeHtml(contestantTitle(cat,ct))}</div>`;
+    const sub = contestantSubtitle(cat,ct);
+    if(sub) html += `<div style="font-size:0.85rem; margin-bottom:8px;">${escapeHtml(sub)}</div>`;
+    cat.criteria.forEach(c=>{
+      html += `<div class="print-criteria-row"><span>${escapeHtml(c.label||'(unnamed)')} (max ${c.max})</span><span class="print-blank-line"></span></div>`;
+    });
+    html += `<div class="print-criteria-row" style="font-weight:700;"><span>Total (max ${catMaxTotal(cat)})</span><span class="print-blank-line"></span></div>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function printBlankSheets(ev){
+  let pages = '';
+  ev.judges.forEach(j=>{
+    ev.categories.forEach(cat=>{
+      pages += buildBlankSheetPageHtml(ev, cat, j.name);
+    });
+  });
+  if(!pages){ showToast('No judges assigned to any contestants yet', true); return; }
+  document.getElementById('printArea').innerHTML = pages;
+  window.print();
+}
+
+function buildJudgeScoresPageHtml(ev, cat, judgeName){
+  const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
+  let html = `<div class="print-page">`;
+  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Judge Scoring Record</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
+  html += `<div class="print-meta">Judge: <b>${escapeHtml(judgeName)}</b> &nbsp;&nbsp; Printed: ${new Date().toLocaleString()}</div>`;
+  contestants.forEach(ct=>{
+    const key = scoreKey(ev.id, cat.id, ct.id, judgeName);
+    const s = state.scores[key];
+    html += `<div style="margin-bottom:18px; border:1px solid #333; padding:10px;">`;
+    html += `<div style="font-weight:700; margin-bottom:6px;">${escapeHtml(contestantTitle(cat,ct))}</div>`;
+    const sub = contestantSubtitle(cat,ct);
+    if(sub) html += `<div style="font-size:0.85rem; margin-bottom:8px;">${escapeHtml(sub)}</div>`;
+    if(!s){
+      html += `<div style="font-size:0.85rem;">Not yet scored</div>`;
+    } else if(s.totalOnly){
+      const total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
+      html += `<div class="print-criteria-row" style="font-weight:700;"><span>Total</span><span>${total} / ${catMaxTotal(cat)}</span></div>`;
+    } else {
+      cat.criteria.forEach(c=>{
+        html += `<div class="print-criteria-row"><span>${escapeHtml(c.label||'(unnamed)')}</span><span>${s[c.key]||0} / ${c.max}</span></div>`;
+      });
+      const total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
+      html += `<div class="print-criteria-row" style="font-weight:700;"><span>Total</span><span>${total} / ${catMaxTotal(cat)}</span></div>`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function printMyScores(ev, cat, judgeName){
+  document.getElementById('printArea').innerHTML = buildJudgeScoresPageHtml(ev, cat, judgeName);
+  window.print();
+}
+
+function buildSignoffPageHtml(ev, cat){
+  const rows = cat.contestants.map(ct=>{
+    const perJudge = ev.judges.map(j=>{
+      if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
+      const key = scoreKey(ev.id, cat.id, ct.id, j.name);
+      const s = state.scores[key];
+      if(!s) return {status:'pending'};
+      return {status:'scored', value: cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0)};
+    });
+    const submitted = perJudge.filter(p=>p.status==='scored').map(p=>p.value);
+    const total = submitted.length ? submitted.reduce((a,b)=>a+b,0) : null;
+    return { contestant: ct, perJudge, total };
+  });
+  rows.sort((a,b)=>{
+    if(a.total===null && b.total===null) return 0;
+    if(a.total===null) return 1;
+    if(b.total===null) return -1;
+    return b.total - a.total;
+  });
+
+  let html = `<div class="print-page">`;
+  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Final Tally Sheet</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
+  html += `<table class="print-table"><thead><tr><th>Place</th><th>Entry</th>`;
+  ev.judges.forEach(j=>{ html += `<th>${escapeHtml(j.name)}</th>`; });
+  html += `<th>Total</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const place = r.total!==null ? (i+1) : '\u2014';
+    const sub = contestantSubtitle(cat,r.contestant);
+    html += `<tr><td>${place}</td><td>${escapeHtml(contestantTitle(cat,r.contestant))}${sub?' \u2014 '+escapeHtml(sub):''}</td>`;
+    r.perJudge.forEach(p=>{
+      if(p.status==='na') html += `<td>\u00b7</td>`;
+      else if(p.status==='pending') html += `<td>\u2014</td>`;
+      else html += `<td>${p.value}</td>`;
+    });
+    html += `<td><b>${r.total===null?'\u2014':r.total}</b></td></tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<div class="print-signatures">`;
+  ev.judges.forEach(j=>{
+    html += `<div class="sig-line"><span>${escapeHtml(j.name)} \u2014 Signature</span><div class="sig-blank"></div></div>`;
+  });
+  html += `<div class="sig-line"><span>Judges Coordinator \u2014 Signature</span><div class="sig-blank"></div></div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+function printSignoffSheet(ev, cat){
+  document.getElementById('printArea').innerHTML = buildSignoffPageHtml(ev, cat);
+  window.print();
+}
+
+function printAllSignoffSheets(ev){
+  if(ev.categories.length===0){ showToast('No categories to print', true); return; }
+  document.getElementById('printArea').innerHTML = ev.categories.map(c=>buildSignoffPageHtml(ev,c)).join('');
+  window.print();
+}
+function attachOrganizerHandlers(){
+  const evSel = document.getElementById('eventSelect');
+  if(evSel) evSel.onchange = (e)=>{
+    if(e.target.value === '__add__'){
+      evSel.value = state.eventId || '';
+      document.getElementById('newEventNameInline').style.display = 'block';
+      document.getElementById('createEventInlineBtn').style.display = 'block';
+      document.getElementById('newEventNameInline').focus();
+      return;
+    }
+    state.eventId = e.target.value; state.categoryId=null; render();
+  };
+
+  const createEventBtn = document.getElementById('createEventInlineBtn');
+  if(createEventBtn) createEventBtn.onclick = async ()=>{
+    const input = document.getElementById('newEventNameInline');
+    const name = input.value.trim();
+    if(!name) return;
+    const newEv = { id: uid(), name, judges: [], categories: [] };
+    state.config.events.push(newEv);
+    await saveConfig();
+    state.eventId = newEv.id;
+    state.categoryId = null;
+    render();
+  };
+
+  const removeEventBtn = document.getElementById('removeCurrentEventBtn');
+  if(removeEventBtn) removeEventBtn.onclick = async ()=>{
+    const ev = currentEvent();
+    if(!ev) return;
+    if(!confirm(`Remove "${ev.name}"? This deletes its judges, categories, contestants, and scores. This cannot be undone.`)) return;
+    const id = ev.id;
+    state.config.events = state.config.events.filter(e=>e.id!==id);
+    state.eventId = state.config.events.length ? state.config.events[0].id : null;
+    Object.keys(state.scores).forEach(k=>{
+      if(k.startsWith(id + '|')) delete state.scores[k];
+    });
+    await saveConfig();
+    await saveScores();
+    render();
+  };
+
+  const loadHistBtn = document.getElementById('loadBaltimoreHistBtn');
+  if(loadHistBtn) loadHistBtn.onclick = async ()=>{
+    loadHistBtn.disabled = true;
+    loadHistBtn.textContent = 'Loading\u2026';
+    await loadBaltimoreHistorical();
+  };
+
+  const fixBtn = document.getElementById('fixBaltimoreBtn');
+  if(fixBtn) fixBtn.onclick = async ()=>{
+    fixBtn.disabled = true;
+    fixBtn.textContent = 'Applying\u2026';
+    await fixBaltimoreCorrections();
+  };
+
+  const loadWiadcaBtn = document.getElementById('loadWiadcaBtn');
+  if(loadWiadcaBtn) loadWiadcaBtn.onclick = async ()=>{
+    loadWiadcaBtn.disabled = true;
+    loadWiadcaBtn.textContent = 'Loading\u2026';
+    await loadWIADCAJuniorData();
+  };
+
+  const orgTabs = document.querySelectorAll('[data-org-tab]');
+  orgTabs.forEach(el=>{
+    el.onclick = ()=>{ state.orgTab = el.getAttribute('data-org-tab'); render(); };
+  });
+
+  if(state.orgTab==='tally'){
+    const sel = document.getElementById('tallyCategorySelect');
+    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; render(); };
+    const ev = currentEvent();
+    if(ev){
+      const printSignoffBtn = document.getElementById('printSignoffBtn');
+      if(printSignoffBtn) printSignoffBtn.onclick = ()=>{
+        const catId = state.categoryId || (ev.categories[0] && ev.categories[0].id);
+        const cat = ev.categories.find(c=>c.id===catId);
+        if(!cat){ showToast('No category selected', true); return; }
+        printSignoffSheet(ev, cat);
+      };
+      const printAllSignoffBtn = document.getElementById('printAllSignoffBtn');
+      if(printAllSignoffBtn) printAllSignoffBtn.onclick = ()=> printAllSignoffSheets(ev);
+    }
+    return;
+  }
+  if(state.orgTab==='detail'){
+    const sel = document.getElementById('detailCategorySelect');
+    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; render(); };
+    return;
+  }
+
+  const ev = currentEvent();
+  if(!ev) return;
+
+  const printBlankBtn = document.getElementById('printBlankSheetsBtn');
+  if(printBlankBtn) printBlankBtn.onclick = ()=> printBlankSheets(ev);
+
+  const addJudgeBtn = document.getElementById('setupAddJudge');
+  if(addJudgeBtn) addJudgeBtn.onclick = async ()=>{
+    const input = document.getElementById('setupNewJudge');
+    const realName = input.value.trim();
+    if(!realName) return;
+    const nums = ev.judges.map(j=>{ const m = /^Judge\s+(\d+)$/i.exec(j.name||''); return m ? parseInt(m[1],10) : 0; });
+    const nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
+    const maskedName = 'Judge ' + nextNum;
+    ev.judges.push({name: maskedName, realName, pin:null});
+    await saveConfig();
+    render();
+  };
+  document.querySelectorAll('[data-remove-judge]').forEach(el=>{
+    el.onclick = async ()=>{
+      const name = el.getAttribute('data-remove-judge');
+      ev.judges = ev.judges.filter(j=>j.name!==name);
+      ev.categories.forEach(cat=>{
+        cat.contestants.forEach(ct=>{ ct.assignedJudges = ct.assignedJudges.filter(n=>n!==name); });
+      });
+      await saveConfig();
+      render();
+    };
+  });
+  document.querySelectorAll('[data-reset-pin]').forEach(el=>{
+    el.onclick = async ()=>{
+      const name = el.getAttribute('data-reset-pin');
+      const judgeObj = ev.judges.find(j=>j.name===name);
+      if(judgeObj){ judgeObj.pin = null; await saveConfig(); render(); showToast(`PIN reset for ${name}`); }
+    };
+  });
+
+  const addCatBtn = document.getElementById('setupAddCategory');
+  if(addCatBtn) addCatBtn.onclick = async ()=>{
+    const input = document.getElementById('setupNewCategory');
+    const name = input.value.trim();
+    if(!name) return;
+    ev.categories.push({id: uid(), name, entryType:'individual', criteria: cloneTemplate(), contestants: []});
+    await saveConfig();
+    render();
+  };
+  attachCategoryCardHandlers(ev);
+
+  const filterInput = document.getElementById('categoryFilterInput');
+  if(filterInput) filterInput.oninput = (e)=>{
+    state.categoryFilter = e.target.value;
+    const container = document.getElementById('categoriesListContainer');
+    if(container){
+      container.innerHTML = renderCategoryCards(ev);
+      attachCategoryCardHandlers(ev);
+    }
+  };
+
+  const importTargetSel = document.getElementById('importTargetCategory');
+  if(importTargetSel) importTargetSel.onchange = ()=>{
+    const nameInput = document.getElementById('importNewCategoryName');
+    nameInput.style.display = importTargetSel.value === '__new__' ? 'block' : 'none';
+  };
+
+  const importFile = document.getElementById('eventImportFile');
+  if(importFile) importFile.onchange = async (e)=>{
+    const statusEl = document.getElementById('eventImportStatus');
+    const file = e.target.files[0];
+    if(!file) return;
+    const targetSel = document.getElementById('importTargetCategory');
+    const targetVal = targetSel.value;
+    if(!targetVal){
+      statusEl.className = 'import-status err';
+      statusEl.textContent = 'Choose a category to import into first.';
+      e.target.value = '';
+      return;
+    }
+    let targetCat;
+    if(targetVal === '__new__'){
+      const newName = document.getElementById('importNewCategoryName').value.trim();
+      if(!newName){
+        statusEl.className = 'import-status err';
+        statusEl.textContent = 'Enter a name for the new category first.';
+        e.target.value = '';
+        return;
+      }
+      targetCat = { id: uid(), name: newName, entryType:'individual', criteria: cloneTemplate(), contestants: [] };
+      ev.categories.push(targetCat);
+    } else {
+      targetCat = ev.categories.find(c=>c.id===targetVal);
+    }
+    statusEl.className = 'import-status';
+    statusEl.textContent = 'Reading file\u2026';
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      let added = 0, skipped = 0, duplicates = 0;
+      const isGroup = targetCat.entryType === 'group';
+      rows.forEach(row=>{
+        const mapped = {band:'', masquerader:'', portrayal:''};
+        Object.keys(row).forEach(k=>{
+          const key = k.toString().trim().toLowerCase();
+          const val = (row[k]??'').toString().trim();
+          if(['band','mas band','band name','name of the band'].includes(key)) mapped.band = val;
+          else if(['masquerader','masquerader name','name of the masquerader','name'].includes(key)) mapped.masquerader = val;
+          else if(['portrayal','title','portrayal title','name of the portrayal'].includes(key)) mapped.portrayal = val;
+        });
+        if(isGroup){
+          if(!mapped.band){ skipped++; return; }
+        } else {
+          if(!mapped.masquerader){ skipped++; return; }
+        }
+        const dup = targetCat.contestants.find(ct =>
+          ct.band.trim().toLowerCase() === mapped.band.trim().toLowerCase() &&
+          ct.portrayal.trim().toLowerCase() === mapped.portrayal.trim().toLowerCase() &&
+          (isGroup || ct.masquerader.trim().toLowerCase() === mapped.masquerader.trim().toLowerCase())
+        );
+        if(dup){ duplicates++; return; }
+        targetCat.contestants.push({id: uid(), band: mapped.band, masquerader: isGroup ? '' : mapped.masquerader, portrayal: mapped.portrayal, assignedJudges: []});
+        added++;
+      });
+      if(added===0){
+        statusEl.className = 'import-status err';
+        statusEl.textContent = isGroup ? 'No new entries imported. Check that a Band column exists and is filled in.' : 'No new contestants imported. Check that a Masquerader column exists and is filled in.';
+      } else {
+        await saveConfig();
+        let msg = `Imported ${added} entr${added!==1?'ies':'y'} into "${targetCat.name}"`;
+        if(duplicates) msg += `. Collapsed ${duplicates} duplicate row(s) (same entry, repeated per judge)`;
+        if(skipped) msg += `. Skipped ${skipped} row(s) missing a required name`;
+        msg += '. Now assign judges to each entry below.';
+        statusEl.className = 'import-status ok';
+        statusEl.textContent = msg;
+        showToast(`Imported ${added} entr${added!==1?'ies':'y'}`);
+        render();
+      }
+    }catch(err){
+      console.error('import failed', err);
+      statusEl.className = 'import-status err';
+      statusEl.textContent = 'Could not read that file. Try exporting as .csv or .xlsx.';
+    }
+    e.target.value = '';
+  };
+
+  let pendingWorkbook = null;
+
+  const workbookFile = document.getElementById('workbookImportFile');
+  if(workbookFile) workbookFile.onchange = async (e)=>{
+    const statusEl = document.getElementById('workbookImportStatus');
+    const file = e.target.files[0];
+    if(!file) return;
+    statusEl.className = 'import-status';
+    statusEl.textContent = 'Reading file\u2026';
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      pendingWorkbook = wb;
+      const wrap = document.getElementById('workbookSheetWrap');
+      const sel = document.getElementById('workbookSheetSelect');
+      sel.innerHTML = wb.SheetNames.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      wrap.style.display = 'block';
+      statusEl.className = '';
+      statusEl.textContent = `Found ${wb.SheetNames.length} sheet${wb.SheetNames.length!==1?'s':''}. Choose one and click Import.`;
+    }catch(err){
+      console.error('workbook read failed', err);
+      statusEl.className = 'import-status err';
+      statusEl.textContent = 'Could not read that file.';
+      pendingWorkbook = null;
+    }
+    e.target.value = '';
+  };
+
+  const workbookGoBtn = document.getElementById('workbookSheetGoBtn');
+  if(workbookGoBtn) workbookGoBtn.onclick = async ()=>{
+    const statusEl = document.getElementById('workbookImportStatus');
+    if(!pendingWorkbook){ statusEl.className='import-status err'; statusEl.textContent='Choose a file first.'; return; }
+    const sel = document.getElementById('workbookSheetSelect');
+    const sheetName = sel.value;
+    const sheet = pendingWorkbook.Sheets[sheetName];
+    if(!sheet){ statusEl.className='import-status err'; statusEl.textContent='Could not read that sheet.'; return; }
+
+    const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+    const headerIdx = detectHeaderRowIndex(aoa);
+    const headerRow = aoa[headerIdx] || [];
+    const mapping = mapHeaderColumns(headerRow);
+    if(mapping.bandIdx<0 && mapping.masqIdx<0 && mapping.portIdx<0){
+      statusEl.className = 'import-status err';
+      statusEl.textContent = 'Could not find Band / Masquerader / Portrayal columns on this sheet.';
+      return;
+    }
+
+    const entryType = mapping.masqIdx>=0 ? 'individual' : 'group';
+    const criteria = mapping.criteriaCols.length ? mapping.criteriaCols.map(c=>({key:uid(), label:c.label, max:c.max})) : cloneTemplate();
+
+    let targetCat = ev.categories.find(c=>c.name.toLowerCase()===sheetName.toLowerCase());
+    let isNew = false;
+    if(!targetCat){
+      targetCat = { id: uid(), name: sheetName, entryType, criteria, contestants: [] };
+      ev.categories.push(targetCat);
+      isNew = true;
+    }
+
+    let added=0, skipped=0, duplicates=0;
+    const isGroup = targetCat.entryType === 'group';
+    for(let r=headerIdx+1; r<aoa.length; r++){
+      const row = aoa[r] || [];
+      if(row.every(c=>String(c||'').trim()==='')) continue;
+      const band = mapping.bandIdx>=0 ? String(row[mapping.bandIdx]||'').trim() : '';
+      const masq = mapping.masqIdx>=0 ? String(row[mapping.masqIdx]||'').trim() : '';
+      const port = mapping.portIdx>=0 ? String(row[mapping.portIdx]||'').trim() : '';
+      if(isGroup){ if(!band){ skipped++; continue; } }
+      else { if(!masq){ skipped++; continue; } }
+      const dup = targetCat.contestants.find(ct =>
+        ct.band.trim().toLowerCase() === band.trim().toLowerCase() &&
+        ct.portrayal.trim().toLowerCase() === port.trim().toLowerCase() &&
+        (isGroup || ct.masquerader.trim().toLowerCase() === masq.trim().toLowerCase())
+      );
+      if(dup){ duplicates++; continue; }
+      targetCat.contestants.push({id: uid(), band, masquerader: isGroup?'':masq, portrayal: port, assignedJudges: []});
+      added++;
+    }
+
+    if(added===0){
+      if(isNew) ev.categories = ev.categories.filter(c=>c.id!==targetCat.id);
+      statusEl.className = 'import-status err';
+      statusEl.textContent = `No contestants found on "${sheetName}". Check the sheet has data below the header row.`;
+      return;
+    }
+
+    await saveConfig();
+    let msg = `${isNew?'Created':'Updated'} category "${targetCat.name}" (${targetCat.entryType}) with ${added} entr${added!==1?'ies':'y'}`;
+    if(duplicates) msg += `, collapsed ${duplicates} duplicate row(s)`;
+    if(skipped) msg += `, skipped ${skipped} row(s) missing a name`;
+    msg += '. Now assign judges to it below.';
+    statusEl.className = 'import-status ok';
+    statusEl.textContent = msg;
+    showToast(`Imported "${sheetName}"`);
+    render();
+  };
+}
+
+function attachCategoryCardHandlers(ev){
+  document.querySelectorAll('[data-cat-toggle]').forEach(el=>{
+    el.onclick = ()=>{
+      const catId = el.getAttribute('data-cat-toggle');
+      state.expandedCats[catId] = !state.expandedCats[catId];
+      const container = document.getElementById('categoriesListContainer');
+      if(container){
+        container.innerHTML = renderCategoryCards(ev);
+        attachCategoryCardHandlers(ev);
+      } else {
+        render();
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-remove-cat]').forEach(el=>{
+    el.onclick = async ()=>{
+      const id = el.getAttribute('data-remove-cat');
+      ev.categories = ev.categories.filter(c=>c.id!==id);
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-etype]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-cat');
+      const val = el.getAttribute('data-etype');
+      const cat = ev.categories.find(c=>c.id===catId);
+      cat.entryType = val;
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-crit-field]').forEach(el=>{
+    el.onchange = async (e)=>{
+      const catId = el.getAttribute('data-cat');
+      const critKey = el.getAttribute('data-crit');
+      const field = el.getAttribute('data-crit-field');
+      const cat = ev.categories.find(c=>c.id===catId);
+      const crit = cat.criteria.find(c=>c.key===critKey);
+      if(!crit) return;
+      crit[field] = field==='max' ? (parseInt(e.target.value,10)||0) : e.target.value;
+      await saveConfig();
+      render();
+    };
+  });
+  document.querySelectorAll('[data-crit-add]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-crit-add');
+      const cat = ev.categories.find(c=>c.id===catId);
+      cat.criteria.push({key: uid(), label:'', max:0});
+      await saveConfig();
+      render();
+    };
+  });
+  document.querySelectorAll('[data-crit-remove]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-cat');
+      const critKey = el.getAttribute('data-crit');
+      const cat = ev.categories.find(c=>c.id===catId);
+      cat.criteria = cat.criteria.filter(c=>c.key!==critKey);
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-add-contestant]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-add-contestant');
+      const cat = ev.categories.find(c=>c.id===catId);
+      cat.contestants.push({id: uid(), band:'', masquerader: cat.entryType==='individual' ? 'New contestant' : '', portrayal:'', assignedJudges: []});
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-assign-toggle]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-cat');
+      const ctId = el.getAttribute('data-contestant');
+      const judgeName = el.getAttribute('data-judge');
+      const cat = ev.categories.find(c=>c.id===catId);
+      const ct = cat.contestants.find(c=>c.id===ctId);
+      if(ct.assignedJudges.includes(judgeName)) ct.assignedJudges = ct.assignedJudges.filter(n=>n!==judgeName);
+      else ct.assignedJudges.push(judgeName);
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-remove-contestant]').forEach(el=>{
+    el.onclick = async ()=>{
+      const catId = el.getAttribute('data-cat2');
+      const ctId = el.getAttribute('data-remove-contestant');
+      const cat = ev.categories.find(c=>c.id===catId);
+      cat.contestants = cat.contestants.filter(c=>c.id!==ctId);
+      await saveConfig();
+      render();
+    };
+  });
+
+  document.querySelectorAll('input[data-field]').forEach(el=>{
+    el.onchange = async (e)=>{
+      const catId = el.getAttribute('data-cat');
+      const ctId = el.getAttribute('data-contestant');
+      const field = el.getAttribute('data-field');
+      const cat = ev.categories.find(c=>c.id===catId);
+      const ct = cat.contestants.find(c=>c.id===ctId);
+      ct[field] = e.target.value;
+      await saveConfig();
+    };
+  });
+}
+
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+loadAll();
+
+setInterval(async ()=>{
+  const orgShouldRefresh = state.mode==='organizer' && state.orgUnlocked && (state.orgTab==='tally' || state.orgTab==='detail');
+  const judgeShouldRefresh = state.mode==='judge' && state.judgeUnlocked && !state.contestantId;
+  if(orgShouldRefresh || judgeShouldRefresh){
+    try{
+      const sc = await sbGet('scores');
+      if(sc){ state.scores = sc; render(); }
+    }catch(e){ console.error('auto-refresh failed', e); }
+  }
+}, 15000);
+</script>
+</body>
+</html>
