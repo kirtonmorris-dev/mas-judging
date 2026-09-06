@@ -313,6 +313,8 @@ let state = {
   draft: {},
   expandedCats: {},
   categoryFilter: '',
+  orgEditKey: null,
+  orgEditDraft: {},
 };
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
@@ -436,6 +438,47 @@ async function saveScoreEntry(key, entry){
     return true;
   }catch(e){
     console.error('saveScoreEntry failed', e);
+    showToast('Save failed — check connection, then try again', true);
+    return false;
+  }
+}
+
+async function saveOrganizerScoreEdit(key){
+  const draft = state.orgEditDraft[key];
+  if(!draft) return false;
+  try{
+    let latest = null;
+    try{ latest = await sbGet('scores'); }catch(e){ console.error(e); }
+    if(!latest) latest = {};
+    const existing = latest[key] || state.scores[key];
+    if(!existing) return false;
+    const updated = {...existing};
+    if(existing.totalOnly){
+      const skip = ['totalOnly','judge','event','category','contestant','submittedAt','editedByOrganizer','previousValues','lastEditedAt'];
+      const critKeys = Object.keys(existing).filter(k=>!skip.includes(k));
+      const totalKey = critKeys.find(k=>existing[k]) || critKeys[0];
+      if(totalKey){
+        updated[totalKey] = draft.total;
+        critKeys.forEach(k=>{ if(k!==totalKey) updated[k]=0; });
+      }
+    } else {
+      Object.keys(draft).forEach(k=>{ updated[k] = draft[k]; });
+    }
+    if(!existing.previousValues){
+      const skip = ['editedByOrganizer','previousValues','lastEditedAt'];
+      const originalSnapshot = {};
+      Object.keys(existing).forEach(k=>{ if(!skip.includes(k)) originalSnapshot[k] = existing[k]; });
+      updated.previousValues = {...originalSnapshot, capturedAt: Date.now()};
+    }
+    updated.editedByOrganizer = true;
+    updated.lastEditedAt = Date.now();
+    latest[key] = updated;
+    await sbSet('scores', latest);
+    state.scores = latest;
+    backupScoresHistory(latest).catch(e=>console.error('history backup failed', e));
+    return true;
+  }catch(e){
+    console.error('saveOrganizerScoreEdit failed', e);
     showToast('Save failed — check connection, then try again', true);
     return false;
   }
@@ -1316,10 +1359,46 @@ function renderJudgeDetail(ev){
       ct.assignedJudges.forEach(judgeName=>{
         const key = scoreKey(ev.id, cat.id, ct.id, judgeName);
         const s = state.scores[key];
+        const editing = s && state.orgEditKey === key;
         html += `<div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">`;
-        html += `<div style="font-weight:700; font-size:0.85rem; margin-bottom:6px;">${escapeHtml(judgeName)}</div>`;
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">`;
+        html += `<div style="font-weight:700; font-size:0.85rem;">${escapeHtml(judgeName)}</div>`;
+        if(s && !editing){
+          html += `<button class="btn btn-outline btn-small" data-edit-score="${escapeHtml(key)}" style="padding:2px 10px; font-size:0.72rem;">Edit</button>`;
+        }
+        html += `</div>`;
         if(!s){
           html += `<div style="color:var(--ink-soft); font-size:0.82rem;">Not yet scored</div>`;
+        } else if(editing){
+          if(!state.orgEditDraft[key]){
+            state.orgEditDraft[key] = {};
+            if(s.totalOnly){
+              state.orgEditDraft[key].total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
+            } else {
+              cat.criteria.forEach(c=>{ state.orgEditDraft[key][c.key] = s[c.key]||0; });
+            }
+          }
+          const draft = state.orgEditDraft[key];
+          if(s.totalOnly){
+            html += `<div style="display:flex; align-items:center; gap:8px; margin:6px 0;">`;
+            html += `<label style="font-size:0.82rem;">Total</label>`;
+            html += `<input type="number" min="0" max="${catMaxTotal(cat)}" value="${draft.total}" data-org-edit-total="${escapeHtml(key)}" style="width:80px;">`;
+            html += `<span style="font-size:0.78rem; color:var(--ink-soft);">/ ${catMaxTotal(cat)}</span>`;
+            html += `</div>`;
+          } else {
+            cat.criteria.forEach(c=>{
+              html += `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:2px 0;">`;
+              html += `<span>${escapeHtml(c.label||'(unnamed)')}</span>`;
+              html += `<input type="number" min="0" max="${c.max}" value="${draft[c.key]||0}" data-org-edit-key="${escapeHtml(key)}" data-org-edit-crit="${c.key}" style="width:64px;">`;
+              html += `</div>`;
+            });
+            const editTotal = cat.criteria.reduce((sum,c)=>sum+(draft[c.key]||0),0);
+            html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:700; margin-top:4px; padding-top:4px; border-top:1px solid var(--line);"><span>Total</span><span data-org-total-for="${escapeHtml(key)}">${editTotal} / ${catMaxTotal(cat)}</span></div>`;
+          }
+          html += `<div style="display:flex; gap:8px; margin-top:8px;">`;
+          html += `<button class="btn btn-primary btn-small" data-save-score-edit="${escapeHtml(key)}">Save</button>`;
+          html += `<button class="btn btn-outline btn-small" data-cancel-score-edit="${escapeHtml(key)}">Cancel</button>`;
+          html += `</div>`;
         } else if(s.totalOnly){
           const total = cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0);
           html += `<div style="font-size:0.9rem;">Total: <b>${total}</b> <span style="color:var(--ink-soft); font-size:0.78rem;">(breakdown not recorded for this entry)</span></div>`;
@@ -1473,7 +1552,7 @@ function attachOrganizerHandlers(){
       document.getElementById('newEventNameInline').focus();
       return;
     }
-    state.eventId = e.target.value; state.categoryId=null; render();
+    state.eventId = e.target.value; state.categoryId=null; state.orgEditKey=null; render();
   };
 
   const createEventBtn = document.getElementById('createEventInlineBtn');
@@ -1528,7 +1607,7 @@ function attachOrganizerHandlers(){
 
   const orgTabs = document.querySelectorAll('[data-org-tab]');
   orgTabs.forEach(el=>{
-    el.onclick = ()=>{ state.orgTab = el.getAttribute('data-org-tab'); render(); };
+    el.onclick = ()=>{ state.orgTab = el.getAttribute('data-org-tab'); state.orgEditKey=null; render(); };
   });
 
   if(state.orgTab==='tally'){
@@ -1550,7 +1629,69 @@ function attachOrganizerHandlers(){
   }
   if(state.orgTab==='detail'){
     const sel = document.getElementById('detailCategorySelect');
-    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; render(); };
+    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; state.orgEditKey=null; render(); };
+
+    document.querySelectorAll('[data-edit-score]').forEach(el=>{
+      el.onclick = ()=>{
+        const key = el.getAttribute('data-edit-score');
+        delete state.orgEditDraft[key];
+        state.orgEditKey = key;
+        render();
+      };
+    });
+
+    document.querySelectorAll('[data-cancel-score-edit]').forEach(el=>{
+      el.onclick = ()=>{
+        const key = el.getAttribute('data-cancel-score-edit');
+        delete state.orgEditDraft[key];
+        state.orgEditKey = null;
+        render();
+      };
+    });
+
+    document.querySelectorAll('input[data-org-edit-crit]').forEach(el=>{
+      el.oninput = (e)=>{
+        const key = el.getAttribute('data-org-edit-key');
+        const critKey = el.getAttribute('data-org-edit-crit');
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v)) v = 0;
+        state.orgEditDraft[key][critKey] = v;
+        const evNow = currentEvent();
+        const catId = state.categoryId || (evNow.categories[0] && evNow.categories[0].id);
+        const catNow = evNow.categories.find(c=>c.id===catId);
+        const total = catNow.criteria.reduce((s,c)=>s+(state.orgEditDraft[key][c.key]||0),0);
+        const totalEl = document.querySelector(`[data-org-total-for="${key}"]`);
+        if(totalEl) totalEl.textContent = total + ' / ' + catMaxTotal(catNow);
+      };
+    });
+
+    document.querySelectorAll('input[data-org-edit-total]').forEach(el=>{
+      el.oninput = (e)=>{
+        const key = el.getAttribute('data-org-edit-total');
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v)) v = 0;
+        state.orgEditDraft[key].total = v;
+      };
+    });
+
+    document.querySelectorAll('[data-save-score-edit]').forEach(el=>{
+      el.onclick = async ()=>{
+        const key = el.getAttribute('data-save-score-edit');
+        el.disabled = true;
+        el.textContent = 'Saving…';
+        const ok = await saveOrganizerScoreEdit(key);
+        if(ok){
+          delete state.orgEditDraft[key];
+          state.orgEditKey = null;
+          showToast('Score updated');
+          render();
+        } else {
+          el.disabled = false;
+          el.textContent = 'Save';
+        }
+      };
+    });
+
     return;
   }
 
