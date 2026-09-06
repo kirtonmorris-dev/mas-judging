@@ -1659,18 +1659,35 @@ function attachOrganizerHandlers(){
     });
 
     document.querySelectorAll('input[data-org-edit-crit]').forEach(el=>{
-      el.oninput = (e)=>{
-        const key = el.getAttribute('data-org-edit-key');
-        const critKey = el.getAttribute('data-org-edit-crit');
-        let v = parseInt(e.target.value,10);
-        if(isNaN(v)) v = 0;
-        state.orgEditDraft[key][critKey] = v;
+      const updateOrgEditTotal = (key)=>{
         const evNow = currentEvent();
         const catId = state.categoryId || (evNow.categories[0] && evNow.categories[0].id);
         const catNow = evNow.categories.find(c=>c.id===catId);
         const total = catNow.criteria.reduce((s,c)=>s+(state.orgEditDraft[key][c.key]||0),0);
         const totalEl = document.querySelector(`[data-org-total-for="${key}"]`);
         if(totalEl) totalEl.textContent = total + ' / ' + catMaxTotal(catNow);
+      };
+      el.oninput = (e)=>{
+        const key = el.getAttribute('data-org-edit-key');
+        const critKey = el.getAttribute('data-org-edit-crit');
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v)) v = 0;
+        state.orgEditDraft[key][critKey] = v;
+        updateOrgEditTotal(key);
+      };
+      el.onblur = (e)=>{
+        const key = el.getAttribute('data-org-edit-key');
+        const critKey = el.getAttribute('data-org-edit-crit');
+        const evNow = currentEvent();
+        const catId = state.categoryId || (evNow.categories[0] && evNow.categories[0].id);
+        const catNow = evNow.categories.find(c=>c.id===catId);
+        const crit = catNow.criteria.find(c=>c.key===critKey);
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v) || v<0) v = 0;
+        if(crit && v>crit.max) v = crit.max;
+        e.target.value = v;
+        state.orgEditDraft[key][critKey] = v;
+        updateOrgEditTotal(key);
       };
     });
 
@@ -1679,6 +1696,18 @@ function attachOrganizerHandlers(){
         const key = el.getAttribute('data-org-edit-total');
         let v = parseInt(e.target.value,10);
         if(isNaN(v)) v = 0;
+        state.orgEditDraft[key].total = v;
+      };
+      el.onblur = (e)=>{
+        const key = el.getAttribute('data-org-edit-total');
+        const evNow = currentEvent();
+        const catId = state.categoryId || (evNow.categories[0] && evNow.categories[0].id);
+        const catNow = evNow.categories.find(c=>c.id===catId);
+        const max = catMaxTotal(catNow);
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v) || v<0) v = 0;
+        if(v>max) v = max;
+        e.target.value = v;
         state.orgEditDraft[key].total = v;
       };
     });
