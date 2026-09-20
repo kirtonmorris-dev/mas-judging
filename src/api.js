@@ -27,25 +27,32 @@ export async function sbSet(id, data){
 }
 
 export async function loadAll(){
-  try{
-    let cfg = null;
-    try{ cfg = await sbGet('config'); } catch(e){ console.error(e); }
-    if(!cfg){ cfg = DEFAULT_CONFIG; }
-    cfg = normalizeConfig(cfg);
-    state.config = cfg;
-    await sbSet('config', cfg);
-    if(!state.eventId && cfg.events.length) state.eventId = cfg.events[0].id;
+  let cfg, cfgFetchOk = true;
+  try{ cfg = await sbGet('config'); }
+  catch(e){ console.error('config load failed', e); cfgFetchOk = false; }
 
-    let sc = null;
-    try{ sc = await sbGet('scores'); } catch(e){ console.error(e); }
-    state.scores = sc || {};
-  }catch(e){
-    console.error('load error', e);
-    state.config = normalizeConfig(DEFAULT_CONFIG);
-    state.eventId = state.config.events[0].id;
-    state.scores = {};
-    showToast('Could not reach the database — check connection', true);
+  if(!cfgFetchOk){
+    // Do NOT fall back to DEFAULT_CONFIG here: doing so used to get written
+    // straight back to the database a few lines down, silently wiping the
+    // real production config whenever this fetch merely blipped. Show an
+    // explicit error and leave the database untouched instead.
+    const loadingMsg = document.getElementById('loadingMsg');
+    if(loadingMsg) loadingMsg.textContent = 'Could not load — check your connection and reload the page.';
+    showToast('Could not reach the database — check connection and reload', true);
+    return;
   }
+
+  cfg = normalizeConfig(cfg || DEFAULT_CONFIG);
+  state.config = cfg;
+  // Safe to persist here: this reflects what the GET above actually
+  // returned (or a genuinely empty database), never a fetch failure.
+  try{ await sbSet('config', cfg); } catch(e){ console.error('save normalized config failed', e); }
+  if(!state.eventId && cfg.events.length) state.eventId = cfg.events[0].id;
+
+  let sc = null;
+  try{ sc = await sbGet('scores'); } catch(e){ console.error('scores load failed', e); }
+  state.scores = sc || {};
+
   document.getElementById('loadingMsg').style.display='none';
   document.getElementById('app').style.display='block';
   renderPennants();
@@ -53,13 +60,34 @@ export async function loadAll(){
 }
 
 export async function saveConfig(){
-  try{ await sbSet('config', state.config); return true; }
+  try{
+    const latest = await sbGet('config');
+    const knownRev = state.config._rev;
+    if(latest && latest._rev !== undefined && knownRev !== undefined && latest._rev !== knownRev){
+      showToast('Setup was changed elsewhere — reload the page before editing again', true);
+      return false;
+    }
+    state.config._rev = (knownRev || 0) + 1;
+    await sbSet('config', state.config);
+    return true;
+  }
   catch(e){ console.error('save config failed', e); showToast('Save failed — check connection', true); return false; }
 }
 
-export async function saveScores(){
-  try{ await sbSet('scores', state.scores); return true; }
-  catch(e){ console.error('save scores failed', e); showToast('Save failed — check connection, then try again', true); return false; }
+export async function saveScoresMerge(mutateFn){
+  try{
+    let latest = await sbGet('scores');
+    if(!latest) latest = {};
+    mutateFn(latest);
+    await sbSet('scores', latest);
+    state.scores = latest;
+    backupScoresHistory(latest).catch(e=>console.error('history backup failed', e));
+    return true;
+  }catch(e){
+    console.error('saveScoresMerge failed', e);
+    showToast('Save failed — check connection, then try again', true);
+    return false;
+  }
 }
 
 export async function backupScoresHistory(snapshot){

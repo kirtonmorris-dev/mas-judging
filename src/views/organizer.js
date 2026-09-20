@@ -1,4 +1,4 @@
-import { saveConfig, saveOrganizerScoreEdit, saveScores } from '../api.js';
+import { saveConfig, saveOrganizerScoreEdit, saveScoresMerge } from '../api.js';
 import { ORG_PIN, cloneTemplate } from '../constants.js';
 import { fixBaltimoreCorrections, loadBaltimoreHistorical, loadWIADCAJuniorData } from '../historicalLoaders.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
@@ -80,11 +80,12 @@ export function attachOrganizerHandlers(){
     const id = ev.id;
     state.config.events = state.config.events.filter(e=>e.id!==id);
     state.eventId = state.config.events.length ? state.config.events[0].id : null;
-    Object.keys(state.scores).forEach(k=>{
-      if(k.startsWith(id + '|')) delete state.scores[k];
-    });
     await saveConfig();
-    await saveScores();
+    await saveScoresMerge(scores=>{
+      Object.keys(scores).forEach(k=>{
+        if(k.startsWith(id + '|')) delete scores[k];
+      });
+    });
     render();
   };
 
