@@ -1,4 +1,4 @@
-import { saveConfig, saveScores } from './api.js';
+import { saveConfig, saveScoresMerge } from './api.js';
 import { cloneTemplate } from './constants.js';
 import { render } from './main.js';
 import { state } from './state.js';
@@ -107,9 +107,10 @@ export async function loadBaltimoreHistorical(){
   function findContestant(cat, band, port){
     return cat.contestants.find(c=>c.band===band && c.portrayal===port);
   }
+  const newScores = {};
   function setScore(cat, ct, judgeName, values){
     const key = scoreKey(histEvent.id, cat.id, ct.id, judgeName);
-    state.scores[key] = {...values, judge: judgeName, event: histEvent.id, category: cat.id, contestant: ct.id, submittedAt: Date.now()};
+    newScores[key] = {...values, judge: judgeName, event: histEvent.id, category: cat.id, contestant: ct.id, submittedAt: Date.now()};
   }
 
   setScore(afiCat, findContestant(afiCat,'East Coast Limers','Pink - The Love Illusion'), 'Judge 1', {presentation:14, craftsmanship:16, creativity:15, impact:12});
@@ -149,12 +150,13 @@ export async function loadBaltimoreHistorical(){
   setScore(ncLargeCat, djjp, 'Judge 1', {colorImpact:18, creativityAuth:14, craftsmanship2:20, presentation2:15});
   setScore(ncLargeCat, djjp, 'Judge 2', {colorImpact:23, creativityAuth:16, craftsmanship2:21, presentation2:17});
 
-  Object.keys(state.scores).forEach(k=>{
-    if(k.startsWith('baltimore-one-carnival|')) delete state.scores[k];
-  });
-
   const okC = await saveConfig();
-  const okS = await saveScores();
+  const okS = await saveScoresMerge(scores=>{
+    Object.assign(scores, newScores);
+    Object.keys(scores).forEach(k=>{
+      if(k.startsWith('baltimore-one-carnival|')) delete scores[k];
+    });
+  });
   if(okC && okS){
     showToast('Baltimore 2026 historical data loaded');
     state.eventId = histEvent.id;
@@ -282,6 +284,9 @@ export async function fixBaltimoreCorrections(){
     ev.judges.push({name:'Judge 4', pin:null});
   }
 
+  const scoreSets = {};
+  const scoreDeletes = [];
+
   const afiCat = ev.categories.find(c=>c.name==='Adult Female Individual');
   if(afiCat){
     const findCt = (band, port) => afiCat.contestants.find(c=>c.band===band && c.portrayal===port);
@@ -293,14 +298,14 @@ export async function fixBaltimoreCorrections(){
     const setSingle = (ct, judgeName, total) => {
       if(!ct) return;
       const key = scoreKey(ev.id, afiCat.id, ct.id, judgeName);
-      state.scores[key] = {presentation: total, craftsmanship:0, creativity:0, impact:0, totalOnly:true, judge:judgeName, event:ev.id, category:afiCat.id, contestant:ct.id, submittedAt:Date.now()};
+      scoreSets[key] = {presentation: total, craftsmanship:0, creativity:0, impact:0, totalOnly:true, judge:judgeName, event:ev.id, category:afiCat.id, contestant:ct.id, submittedAt:Date.now()};
     };
     setSingle(alana,'Judge 1',12); setSingle(alana,'Judge 2',16); setSingle(alana,'Judge 3',15); setSingle(alana,'Judge 4',14);
     setSingle(selah,'Judge 1',15); setSingle(selah,'Judge 2',15); setSingle(selah,'Judge 3',16); setSingle(selah,'Judge 4',15);
     const pearl = findCt('Jackie and Associates','The Song of Rapso');
     if(pearl){
       ['Judge 1','Judge 2','Judge 3','Judge 4'].forEach(j=>{
-        delete state.scores[scoreKey(ev.id, afiCat.id, pearl.id, j)];
+        scoreDeletes.push(scoreKey(ev.id, afiCat.id, pearl.id, j));
       });
     }
   }
@@ -315,7 +320,7 @@ export async function fixBaltimoreCorrections(){
     const setSingleNC = (ct, judgeName, total) => {
       if(!ct) return;
       const key = scoreKey(ev.id, nclCat.id, ct.id, judgeName);
-      state.scores[key] = {colorImpact: total, creativityAuth:0, craftsmanship2:0, presentation2:0, totalOnly:true, judge:judgeName, event:ev.id, category:nclCat.id, contestant:ct.id, submittedAt:Date.now()};
+      scoreSets[key] = {colorImpact: total, creativityAuth:0, craftsmanship2:0, presentation2:0, totalOnly:true, judge:judgeName, event:ev.id, category:nclCat.id, contestant:ct.id, submittedAt:Date.now()};
     };
     setSingleNC(djjp,'Judge 1',63); setSingleNC(djjp,'Judge 2',67); setSingleNC(djjp,'Judge 3',77);
     setSingleNC(zan,'Judge 1',54); setSingleNC(zan,'Judge 2',73); setSingleNC(zan,'Judge 3',71);
@@ -324,7 +329,10 @@ export async function fixBaltimoreCorrections(){
   }
 
   const okC = await saveConfig();
-  const okS = await saveScores();
+  const okS = await saveScoresMerge(scores=>{
+    Object.assign(scores, scoreSets);
+    scoreDeletes.forEach(k=>delete scores[k]);
+  });
   if(okC && okS) showToast('Baltimore corrections applied');
   else showToast('Corrections may be incomplete — check connection', true);
   render();

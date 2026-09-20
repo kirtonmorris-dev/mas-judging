@@ -43,6 +43,7 @@ export const DEFAULT_CONFIG = {
 };
 
 export function normalizeConfig(cfg){
+  if(cfg._rev === undefined) cfg._rev = 0;
   (cfg.events||[]).forEach(ev=>{
     ev.judges = (ev.judges||[]).map(j => typeof j === 'string' ? {name:j, realName:j, pin:null} : j);
     ev.judges.forEach(j=>{ if(typeof j.realName !== 'string' || !j.realName) j.realName = j.name; });
