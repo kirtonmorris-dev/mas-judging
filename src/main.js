@@ -2,6 +2,7 @@
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
 import { fetchScores, loadAll } from './api.js';
 import { state } from './state.js';
+import { draftHasUnsavedWork } from './utils.js';
 import { attachJudgeHandlers, renderJudgeMode } from './views/judge.js';
 import { attachOrganizerHandlers, attachPinHandlers, renderOrganizer, renderPinGate } from './views/organizer.js';
 
@@ -30,6 +31,20 @@ export function render(){
 
 document.getElementById('tabJudge').onclick = ()=>{ state.mode='judge'; setActiveTab(); render(); };
 document.getElementById('tabOrganizer').onclick = ()=>{ state.mode='organizer'; setActiveTab(); render(); };
+
+// Warn before closing/reloading if any judge has an unsubmitted score draft --
+// state.draft lives only in memory, so this is the only thing standing between
+// a stray tab close and losing a half-entered score.
+window.onbeforeunload = (e)=>{
+  if(!state.config) return;
+  const hasUnsaved = Object.keys(state.draft).some(key=>{
+    const [evId, catId] = key.split('|');
+    const ev = state.config.events.find(e=>e.id===evId);
+    const cat = ev && ev.categories.find(c=>c.id===catId);
+    return cat && draftHasUnsavedWork(key, cat);
+  });
+  if(hasUnsaved){ e.preventDefault(); e.returnValue=''; return ''; }
+};
 
 loadAll();
 

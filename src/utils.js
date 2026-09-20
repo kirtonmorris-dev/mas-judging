@@ -37,6 +37,20 @@ export function entityLabel(ev, plural){
   return plural ? (ev.contestantLabelPlural || 'Bands') : (ev.contestantLabel || 'Band');
 }
 
+// True when the in-progress draft for `key` has criterion values that differ
+// from what's actually saved (or, if nothing's saved yet, any nonzero value) --
+// i.e. there's real unsubmitted work worth warning about losing.
+export function draftHasUnsavedWork(key, cat){
+  const draft = state.draft[key];
+  if(!draft) return false;
+  const saved = state.scores[key];
+  return cat.criteria.some(c=>{
+    const d = draft[c.key] || 0;
+    const s = saved ? (saved[c.key] || 0) : 0;
+    return d !== s;
+  });
+}
+
 export function shortJudgeLabel(name){
   const m = /^Judge\s+(\d+)$/i.exec((name||'').trim());
   return m ? ('J'+m[1]) : name;
