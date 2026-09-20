@@ -1,6 +1,6 @@
 /* Carnival Judging — Live Scoring for Every Competition
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
-import { loadAll, sbGet } from './api.js';
+import { fetchScores, loadAll } from './api.js';
 import { state } from './state.js';
 import { attachJudgeHandlers, renderJudgeMode } from './views/judge.js';
 import { attachOrganizerHandlers, attachPinHandlers, renderOrganizer, renderPinGate } from './views/organizer.js';
@@ -38,7 +38,7 @@ setInterval(async ()=>{
   const judgeShouldRefresh = state.mode==='judge' && state.judgeUnlocked && !state.contestantId;
   if(orgShouldRefresh || judgeShouldRefresh){
     try{
-      const sc = await sbGet('scores');
+      const sc = await fetchScores();
       if(sc){ state.scores = sc; render(); }
     }catch(e){ console.error('auto-refresh failed', e); }
   }
