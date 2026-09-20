@@ -14,4 +14,6 @@ export let state = {
   categoryFilter: '',
   orgEditKey: null,
   orgEditDraft: {},
+  expandedCompetitionSettings: false,
+  tallyStageFilter: '',
 };

@@ -42,17 +42,39 @@ export const DEFAULT_CONFIG = {
   ]
 };
 
+// Defaults chosen so an event/category saved before the competition
+// taxonomy existed renders and behaves exactly as it did before: the
+// default contestant label and field labels match the strings that used
+// to be hardcoded everywhere ("Band"/"Masquerader"/"Portrayal"), stages
+// and extraFields default to empty (today's exact behavior), and
+// competitionFamily defaults to 'mas' since that's what every existing
+// event already is.
 export function normalizeConfig(cfg){
   if(cfg._rev === undefined) cfg._rev = 0;
   (cfg.events||[]).forEach(ev=>{
     ev.judges = (ev.judges||[]).map(j => typeof j === 'string' ? {name:j, realName:j, pin:null} : j);
     ev.judges.forEach(j=>{ if(typeof j.realName !== 'string' || !j.realName) j.realName = j.name; });
+    // undefined = legacy data that predates this field -> default to 'mas'.
+    // null = organizer explicitly chose "Custom / Unassigned" -> keep it.
+    if(ev.competitionFamily === undefined) ev.competitionFamily = 'mas';
+    if(ev.competitionType === undefined) ev.competitionType = null;
+    if(!ev.scope) ev.scope = 'community';
+    if(ev.active === undefined) ev.active = true;
+    if(!ev.contestantLabel) ev.contestantLabel = 'Band';
+    if(!ev.contestantLabelPlural) ev.contestantLabelPlural = 'Bands';
+    if(!ev.fieldLabels || typeof ev.fieldLabels !== 'object') ev.fieldLabels = {};
+    if(!ev.fieldLabels.primary) ev.fieldLabels.primary = 'Band';
+    if(!ev.fieldLabels.secondary) ev.fieldLabels.secondary = 'Masquerader';
+    if(!ev.fieldLabels.detail) ev.fieldLabels.detail = 'Portrayal';
     (ev.categories||[]).forEach(cat=>{
       if(cat.entryType !== 'individual' && cat.entryType !== 'group') cat.entryType = 'individual';
       if(!Array.isArray(cat.criteria) || cat.criteria.length===0) cat.criteria = cloneTemplate();
+      if(!Array.isArray(cat.stages)) cat.stages = [];
+      if(!Array.isArray(cat.extraFields)) cat.extraFields = [];
       (cat.contestants||[]).forEach(ct=>{
         if(!Array.isArray(ct.assignedJudges)) ct.assignedJudges = [];
         if(typeof ct.masquerader !== 'string') ct.masquerader = '';
+        if(!ct.extra || typeof ct.extra !== 'object') ct.extra = {};
       });
     });
   });

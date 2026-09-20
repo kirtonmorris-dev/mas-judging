@@ -32,6 +32,11 @@ export function sortContestants(cat, contestants){
   });
 }
 
+export function entityLabel(ev, plural){
+  if(!ev) return plural ? 'Contestants' : 'Contestant';
+  return plural ? (ev.contestantLabelPlural || 'Bands') : (ev.contestantLabel || 'Band');
+}
+
 export function shortJudgeLabel(name){
   const m = /^Judge\s+(\d+)$/i.exec((name||'').trim());
   return m ? ('J'+m[1]) : name;

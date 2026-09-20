@@ -3,7 +3,7 @@ import { render } from '../main.js';
 import { printMyScores } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, escapeAttr, escapeHtml, judgeCategories, scoreKey, sortContestants } from '../utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, entityLabel, escapeAttr, escapeHtml, judgeCategories, scoreKey, sortContestants } from '../utils.js';
 import { renderEventPicker } from '../views/shared.js';
 
 export function renderJudgeMode(){
@@ -69,26 +69,28 @@ export function renderJudgeMode(){
   html += '</select>';
   html += '</div>';
 
-  if(!state.categoryId) return html + '<div class="empty">Choose a category to see your assigned contestants.</div>';
+  const entityPlural = entityLabel(ev, true).toLowerCase();
+  if(!state.categoryId) return html + `<div class="empty">Choose a category to see your assigned ${entityPlural}.</div>`;
 
   const cat = myCats.find(c=>c.id===state.categoryId);
-  if(!cat) return html + '<div class="empty">Choose a category to see your assigned contestants.</div>';
+  if(!cat) return html + `<div class="empty">Choose a category to see your assigned ${entityPlural}.</div>`;
 
   const myContestants = sortContestants(cat, cat.contestants.filter(ct => ct.assignedJudges.includes(state.judge)));
-  if(myContestants.length===0) return html + '<div class="empty">No contestants assigned to you in this category yet.</div>';
+  if(myContestants.length===0) return html + `<div class="empty">No ${entityPlural} assigned to you in this category yet.</div>`;
 
   if(state.contestantId){
     const contestant = myContestants.find(c=>c.id===state.contestantId);
     if(contestant) return html + renderScoringCard(ev, cat, contestant);
   }
 
-  html += '<div class="section-title">Your Contestants</div><div class="contestant-list">';
+  html += `<div class="section-title">Your ${escapeHtml(entityLabel(ev, true))}</div><div class="contestant-list">`;
   myContestants.forEach(ct=>{
     const key = scoreKey(ev.id, cat.id, ct.id, state.judge);
     const done = !!state.scores[key];
+    const stageBadge = ct.stage ? `<span class="badge pending" style="background:#EAEAF0; color:var(--ink-soft);">${escapeHtml(ct.stage)}</span>` : '';
     html += `<div class="contestant-item" data-contestant="${ct.id}">
       <div class="info"><b>${escapeHtml(contestantTitle(cat,ct))}</b><span>${escapeHtml(contestantSubtitle(cat,ct))}</span></div>
-      <span class="badge ${done?'done':'pending'}">${done?'Scored':'Pending'}</span>
+      <span style="display:flex; gap:6px; align-items:center;">${stageBadge}<span class="badge ${done?'done':'pending'}">${done?'Scored':'Pending'}</span></span>
     </div>`;
   });
   html += '</div>';
