@@ -419,6 +419,9 @@ export function attachCategoryCardHandlers(ev){
       const catId = el.getAttribute('data-cat');
       const critKey = el.getAttribute('data-crit');
       const cat = ev.categories.find(c=>c.id===catId);
+      const crit = cat.criteria.find(c=>c.key===critKey);
+      const label = crit && crit.label ? `"${crit.label}"` : 'this criterion';
+      if(!confirm(`Remove ${label}? This cannot be undone.`)) return;
       cat.criteria = cat.criteria.filter(c=>c.key!==critKey);
       await saveConfig();
       render();
@@ -506,6 +509,9 @@ export function attachCategoryCardHandlers(ev){
       const catId = el.getAttribute('data-cat');
       const stageName = el.getAttribute('data-stage');
       const cat = ev.categories.find(c=>c.id===catId);
+      const affected = cat.contestants.filter(ct=>ct.stage===stageName).length;
+      const warning = affected ? ` ${affected} ${entityLabel(ev, affected!==1).toLowerCase()} currently marked for it will lose that stage assignment.` : '';
+      if(!confirm(`Remove stage "${stageName}"?${warning} This cannot be undone.`)) return;
       cat.stages = (cat.stages||[]).filter(s=>s!==stageName);
       cat.contestants.forEach(ct=>{ if(ct.stage===stageName) delete ct.stage; });
       await saveConfig();
