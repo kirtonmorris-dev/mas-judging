@@ -2,6 +2,7 @@
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
 import { fetchScores, loadAll } from './api.js';
 import { state } from './state.js';
+import { initConnectionBanner } from './ui.js';
 import { draftHasUnsavedWork } from './utils.js';
 import { attachJudgeHandlers, renderJudgeMode } from './views/judge.js';
 import { attachOrganizerHandlers, attachPinHandlers, renderOrganizer, renderPinGate } from './views/organizer.js';
@@ -46,6 +47,7 @@ window.onbeforeunload = (e)=>{
   if(hasUnsaved){ e.preventDefault(); e.returnValue=''; return ''; }
 };
 
+initConnectionBanner();
 loadAll();
 
 setInterval(async ()=>{

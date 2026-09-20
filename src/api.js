@@ -111,8 +111,20 @@ export async function loadAll(){
 
   if(!cfgFetchOk){
     const loadingMsg = document.getElementById('loadingMsg');
-    if(loadingMsg) loadingMsg.textContent = 'Could not load — check your connection and reload the page.';
-    showToast('Could not reach the database — check connection and reload', true);
+    if(loadingMsg){
+      loadingMsg.innerHTML = '';
+      const msg = document.createElement('div');
+      msg.textContent = 'Could not load — check your connection.';
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'btn btn-outline-light btn-small';
+      retryBtn.style.marginTop = '12px';
+      retryBtn.textContent = 'Retry';
+      retryBtn.onclick = ()=>{ loadingMsg.textContent = 'Loading scoresheet…'; loadAll(); };
+      loadingMsg.appendChild(msg);
+      loadingMsg.appendChild(retryBtn);
+    }
+    showToast('Could not reach the database — check connection', true);
     return;
   }
 
@@ -143,7 +155,12 @@ export async function saveConfig(){
       showToast('Setup was changed elsewhere — reload the page before editing again', true);
       return false;
     }
-    console.error('save config failed', e); showToast('Save failed — check connection', true); return false;
+    console.error('save config failed', e);
+    showToast('Save failed — check connection', true, async ()=>{
+      const ok = await saveConfig();
+      if(ok) render();
+    });
+    return false;
   }
 }
 
@@ -171,7 +188,10 @@ export async function saveScoresMerge(mutateFn){
     return true;
   }catch(e){
     console.error('saveScoresMerge failed', e);
-    showToast('Save failed — check connection, then try again', true);
+    showToast('Save failed — check connection', true, async ()=>{
+      const ok = await saveScoresMerge(mutateFn);
+      if(ok) render();
+    });
     return false;
   }
 }
@@ -186,7 +206,10 @@ export async function saveScoreEntry(key, entry){
     return true;
   }catch(e){
     console.error('saveScoreEntry failed', e);
-    showToast('Save failed — check connection, then try again', true);
+    showToast('Save failed — check connection', true, async ()=>{
+      const ok = await saveScoreEntry(key, entry);
+      if(ok) render();
+    });
     return false;
   }
 }
@@ -230,7 +253,14 @@ export async function saveOrganizerScoreEdit(key){
     return true;
   }catch(e){
     console.error('saveOrganizerScoreEdit failed', e);
-    showToast('Save failed — check connection, then try again', true);
+    showToast('Save failed — check connection', true, async ()=>{
+      const ok = await saveOrganizerScoreEdit(key);
+      if(ok){
+        delete state.orgEditDraft[key];
+        state.orgEditKey = null;
+      }
+      render();
+    });
     return false;
   }
 }
