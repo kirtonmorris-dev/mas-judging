@@ -3,11 +3,29 @@
    any Carnival organization). This file is pure reference data: nothing
    here is an actual event/competition instance, and nothing here is
    fabricated scoring criteria. Templates only carry defaultCriteria where
-   the existing application already defines them (Mas); every other
-   template leaves criteria for the organizer to define, same as today's
-   category setup already requires. */
+   they're sourced from the application's own existing data (Mas) or a
+   verified primary document (Panorama -- see PANORAMA_CRITERIA_TEMPLATE
+   below); every other template leaves criteria for the organizer to
+   define, same as today's category setup already requires. */
 
 import { CRITERIA_TEMPLATE } from './constants.js';
+
+// Sourced verbatim from Pan Trinbago's official "Competition Rules --
+// Panorama 2018" document, clause 7.1/7.2: every steelband is marked out
+// of 100 points across these four categories. That document defines no
+// sub-criteria breakdown (no Introduction/Re-Harmonization/etc.), so none
+// is included here -- only what's confirmed by the primary source.
+// Directly confirmed for the National (adult) Conventional and Single Pan
+// divisions; applied to the Junior and Tobago divisions below as the same
+// widely-used standard, since those divisions' own rules documents weren't
+// available to verify independently -- organizers should confirm against
+// their specific competition's rules if those differ.
+const PANORAMA_CRITERIA_TEMPLATE = [
+  { key:'arrangement', label:'Arrangement', max:40 },
+  { key:'generalPerformance', label:'General Performance', max:40 },
+  { key:'tone', label:'Tone', max:10 },
+  { key:'rhythm', label:'Rhythm', max:10 },
+];
 
 export const COMPETITION_FAMILIES = [
   { id:'mas', name:'Mas', contestantLabel:'Band', contestantLabelPlural:'Bands',
@@ -60,15 +78,15 @@ export const COMPETITION_TEMPLATES = [
   { id:'mas-kiddies-band-of-year', familyId:'mas', name:'Kiddies Band of the Year', entryTypeDefault:'group', defaultCriteria: null },
 
   // ---------------- Panorama ----------------
-  { id:'pan-single-pan', familyId:'panorama', name:'National Single Pan', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-small-conventional', familyId:'panorama', name:'National Small Conventional Bands', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-medium-conventional', familyId:'panorama', name:'National Medium Conventional Bands', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-large-conventional', familyId:'panorama', name:'National Large Conventional Bands', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-junior-21-under', familyId:'panorama', name:'National Junior Panorama 21 & Under', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-junior-19-under', familyId:'panorama', name:'National Junior Panorama 19 & Under', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-junior-primary', familyId:'panorama', name:'National Junior Panorama Primary Schools', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-junior-secondary', familyId:'panorama', name:'National Junior Panorama Secondary Schools', entryTypeDefault:'group', defaultCriteria: null },
-  { id:'pan-tobago', familyId:'panorama', name:'Tobago Panorama', entryTypeDefault:'group', defaultCriteria: null },
+  { id:'pan-single-pan', familyId:'panorama', name:'National Single Pan', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-small-conventional', familyId:'panorama', name:'National Small Conventional Bands', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-medium-conventional', familyId:'panorama', name:'National Medium Conventional Bands', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-large-conventional', familyId:'panorama', name:'National Large Conventional Bands', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-junior-21-under', familyId:'panorama', name:'National Junior Panorama 21 & Under', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-junior-19-under', familyId:'panorama', name:'National Junior Panorama 19 & Under', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-junior-primary', familyId:'panorama', name:'National Junior Panorama Primary Schools', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-junior-secondary', familyId:'panorama', name:'National Junior Panorama Secondary Schools', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
+  { id:'pan-tobago', familyId:'panorama', name:'Tobago Panorama', entryTypeDefault:'group', defaultCriteria: PANORAMA_CRITERIA_TEMPLATE },
 
   // ---------------- Calypso ----------------
   { id:'calypso-national-monarch', familyId:'calypso', name:'National Calypso Monarch', entryTypeDefault:'individual', defaultCriteria: null },
