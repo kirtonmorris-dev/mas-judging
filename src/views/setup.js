@@ -270,7 +270,22 @@ export function renderCategoryCards(ev){
       html += renderStagesBox(cat);
       html += renderExtraFieldsBox(cat);
 
-      sortContestants(cat, cat.contestants).forEach(ct=>{
+      const ctFilterRaw = state.contestantFilters[cat.id] || '';
+      const ctFilter = ctFilterRaw.trim().toLowerCase();
+      const entityPluralLower = escapeHtml(entityLabel(ev, true)).toLowerCase();
+      if(cat.contestants.length > 5){
+        html += `<div style="margin:14px 0 10px;"><input type="text" data-contestant-filter="${cat.id}" placeholder="Filter ${entityPluralLower}&hellip;" value="${escapeAttr(ctFilterRaw)}"></div>`;
+      }
+      const visibleContestants = sortContestants(cat, cat.contestants).filter(ct=>{
+        if(!ctFilter) return true;
+        const hay = [ct.band, ct.masquerader, ct.portrayal].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(ctFilter);
+      });
+      if(cat.contestants.length>0 && visibleContestants.length===0){
+        html += `<div class="empty">No ${entityPluralLower} match your filter.</div>`;
+      }
+
+      visibleContestants.forEach(ct=>{
         html += `<div class="contestant-row">
           <div class="row"><div><label>${escapeHtml(primaryLabel)}</label><input type="text" value="${escapeAttr(ct.band)}" data-field="band" data-cat="${cat.id}" data-contestant="${ct.id}"></div></div>`;
         if(cat.entryType === 'individual'){
@@ -324,6 +339,21 @@ export function renderCategoryCards(ev){
 }
 
 export function attachCategoryCardHandlers(ev){
+  document.querySelectorAll('input[data-contestant-filter]').forEach(el=>{
+    el.oninput = (e)=>{
+      const catId = el.getAttribute('data-contestant-filter');
+      state.contestantFilters[catId] = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      const container = document.getElementById('categoriesListContainer');
+      if(container){
+        container.innerHTML = renderCategoryCards(ev);
+        attachCategoryCardHandlers(ev);
+        const newInput = container.querySelector(`input[data-contestant-filter="${catId}"]`);
+        if(newInput){ newInput.focus(); newInput.setSelectionRange(cursorPos, cursorPos); }
+      }
+    };
+  });
+
   document.querySelectorAll('[data-cat-toggle]').forEach(el=>{
     el.onclick = ()=>{
       const catId = el.getAttribute('data-cat-toggle');
@@ -341,6 +371,10 @@ export function attachCategoryCardHandlers(ev){
   document.querySelectorAll('[data-remove-cat]').forEach(el=>{
     el.onclick = async ()=>{
       const id = el.getAttribute('data-remove-cat');
+      const cat = ev.categories.find(c=>c.id===id);
+      const count = cat ? cat.contestants.length : 0;
+      const label = cat ? entityLabel(ev, count!==1).toLowerCase() : 'entries';
+      if(!confirm(`Remove category "${cat ? cat.name : ''}" and its ${count} ${label}? This cannot be undone.`)) return;
       ev.categories = ev.categories.filter(c=>c.id!==id);
       await saveConfig();
       render();
@@ -420,6 +454,9 @@ export function attachCategoryCardHandlers(ev){
       const catId = el.getAttribute('data-cat2');
       const ctId = el.getAttribute('data-remove-contestant');
       const cat = ev.categories.find(c=>c.id===catId);
+      const ct = cat.contestants.find(c=>c.id===ctId);
+      const label = ct ? (ct.band || ct.masquerader || `this ${entityLabel(ev,false).toLowerCase()}`) : `this ${entityLabel(ev,false).toLowerCase()}`;
+      if(!confirm(`Remove "${label}"? This cannot be undone.`)) return;
       cat.contestants = cat.contestants.filter(c=>c.id!==ctId);
       await saveConfig();
       render();
