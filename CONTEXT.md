@@ -1,4 +1,4 @@
-# Mas Judging — Project Context
+# Carnival Judging — Project Context
 
 This file exists so any future Claude Code session (or human) picking up this
 project has the background needed to work on it safely. Read this before
