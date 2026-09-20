@@ -73,8 +73,7 @@ export async function backupScoresHistory(snapshot){
 
 export async function saveScoreEntry(key, entry){
   try{
-    let latest = null;
-    try{ latest = await sbGet('scores'); }catch(e){ console.error(e); }
+    let latest = await sbGet('scores');
     if(!latest) latest = {};
     latest[key] = entry;
     await sbSet('scores', latest);
@@ -92,8 +91,7 @@ export async function saveOrganizerScoreEdit(key){
   const draft = state.orgEditDraft[key];
   if(!draft) return false;
   try{
-    let latest = null;
-    try{ latest = await sbGet('scores'); }catch(e){ console.error(e); }
+    let latest = await sbGet('scores');
     if(!latest) latest = {};
     const existing = latest[key] || state.scores[key];
     let updated;
