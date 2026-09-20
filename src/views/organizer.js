@@ -1,5 +1,5 @@
 import { saveConfig, saveOrganizerScoreEdit, saveScoresMerge } from '../api.js';
-import { ORG_PIN, cloneTemplate } from '../constants.js';
+import { ORG_PIN, cloneTemplate, normalizeConfig } from '../constants.js';
 import { fixBaltimoreCorrections, loadBaltimoreHistorical, loadWIADCAJuniorData } from '../historicalLoaders.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
 import { render } from '../main.js';
@@ -8,7 +8,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, uid } from '../utils.js';
 import { renderJudgeDetail } from '../views/judgeDetail.js';
-import { attachCategoryCardHandlers, renderCategoryCards, renderSetup } from '../views/setup.js';
+import { attachCategoryCardHandlers, attachCompetitionSettingsHandlers, renderCategoryCards, renderSetup } from '../views/setup.js';
 import { renderEventPicker } from '../views/shared.js';
 import { renderTally } from '../views/tally.js';
 
@@ -66,6 +66,7 @@ export function attachOrganizerHandlers(){
     if(!name) return;
     const newEv = { id: uid(), name, judges: [], categories: [] };
     state.config.events.push(newEv);
+    normalizeConfig(state.config);
     await saveConfig();
     state.eventId = newEv.id;
     state.categoryId = null;
@@ -117,7 +118,9 @@ export function attachOrganizerHandlers(){
 
   if(state.orgTab==='tally'){
     const sel = document.getElementById('tallyCategorySelect');
-    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; render(); };
+    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; state.tallyStageFilter=''; render(); };
+    const stageSel = document.getElementById('tallyStageSelect');
+    if(stageSel) stageSel.onchange = (e)=>{ state.tallyStageFilter = e.target.value; render(); };
     const ev = currentEvent();
     if(ev){
       const printSignoffBtn = document.getElementById('printSignoffBtn');
@@ -231,6 +234,8 @@ export function attachOrganizerHandlers(){
 
   const ev = currentEvent();
   if(!ev) return;
+
+  attachCompetitionSettingsHandlers(ev);
 
   const printBlankBtn = document.getElementById('printBlankSheetsBtn');
   if(printBlankBtn) printBlankBtn.onclick = ()=> printBlankSheets(ev);

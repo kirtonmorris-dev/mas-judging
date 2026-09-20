@@ -14,14 +14,27 @@ export function renderTally(ev){
   const cat = ev.categories.find(c=>c.id===catId);
   if(!cat) return html;
 
+  const stages = cat.stages || [];
+  if(stages.length){
+    if(state.tallyStageFilter && !stages.includes(state.tallyStageFilter)) state.tallyStageFilter = '';
+    html += `<div class="card"><label>Stage</label><select id="tallyStageSelect">
+        <option value="">All stages</option>
+        ${stages.map(s=>`<option value="${escapeHtml(s)}" ${state.tallyStageFilter===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+      </select></div>`;
+  }
+
   html += `<div class="row" style="margin-bottom:12px;">
       <button class="btn btn-outline-light btn-small" id="printSignoffBtn">Print for signatures</button>
       <button class="btn btn-outline-light btn-small" id="printAllSignoffBtn">Print all categories</button>
     </div>`;
 
-  const catJudges = ev.judges.filter(j => cat.contestants.some(ct => ct.assignedJudges.includes(j.name)));
+  const visibleContestants = (stages.length && state.tallyStageFilter)
+    ? cat.contestants.filter(ct=>ct.stage===state.tallyStageFilter)
+    : cat.contestants;
 
-  const rows = cat.contestants.map(ct=>{
+  const catJudges = ev.judges.filter(j => visibleContestants.some(ct => ct.assignedJudges.includes(j.name)));
+
+  const rows = visibleContestants.map(ct=>{
     const perJudge = catJudges.map(j=>{
       if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
       const key = scoreKey(ev.id, cat.id, ct.id, j.name);

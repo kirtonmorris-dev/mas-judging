@@ -1,5 +1,5 @@
 import { saveConfig, saveScoresMerge } from './api.js';
-import { cloneTemplate } from './constants.js';
+import { cloneTemplate, normalizeConfig } from './constants.js';
 import { render } from './main.js';
 import { state } from './state.js';
 import { showToast } from './ui.js';
@@ -103,6 +103,7 @@ export async function loadBaltimoreHistorical(){
 
   const histEvent = {id: uid(), name: HIST_NAME, judges, categories};
   state.config.events.push(histEvent);
+  normalizeConfig(state.config);
 
   function findContestant(cat, band, port){
     return cat.contestants.find(c=>c.band===band && c.portrayal===port);
