@@ -1,4 +1,4 @@
-/* Mas Judging — Live Carnival Scoring
+/* Carnival Judging — Live Scoring for Every Competition
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
 import { loadAll, sbGet } from './api.js';
 import { state } from './state.js';
