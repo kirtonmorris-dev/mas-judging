@@ -1,0 +1,17 @@
+export let state = {
+  config: null,
+  scores: {},
+  mode: 'judge',
+  orgUnlocked: false,
+  orgTab: 'setup',
+  eventId: null,
+  judge: null,
+  judgeUnlocked: false,
+  categoryId: null,
+  contestantId: null,
+  draft: {},
+  expandedCats: {},
+  categoryFilter: '',
+  orgEditKey: null,
+  orgEditDraft: {},
+};
