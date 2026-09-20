@@ -126,9 +126,15 @@ export function renderScoringCard(ev, cat, contestant){
     </div>`;
   });
 
-  html += `<div class="total-strip"><span>Total</span><span class="num"><span id="liveTotal">${total}</span> <span style="font-size:1rem;">/ ${maxTotal}</span></span></div>`;
-  html += `<button class="btn btn-primary" id="submitScore">${existing?'Update score':'Submit score'}</button>`;
   html += `</div>`;
+  html += `<div class="score-bar-spacer"></div>`;
+  html += `<div class="score-action-bar">
+      <div class="score-action-total">
+        <span class="score-action-label">Total</span>
+        <span class="num"><span id="liveTotal">${total}</span><span class="of"> / ${maxTotal}</span></span>
+      </div>
+      <button class="btn btn-primary" id="submitScore">${existing?'Update score':'Submit score'}</button>
+    </div>`;
   return html;
 }
 

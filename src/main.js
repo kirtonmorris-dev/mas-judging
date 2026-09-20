@@ -12,6 +12,8 @@ export function setActiveTab(){
 
 export function render(){
   const app = document.getElementById('app');
+  const container = document.querySelector('.container');
+  if(container) container.classList.toggle('container-wide', state.mode === 'organizer');
   if(state.mode === 'judge'){
     app.innerHTML = renderJudgeMode();
     attachJudgeHandlers();

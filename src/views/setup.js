@@ -75,10 +75,6 @@ export function renderCategoryCards(ev){
 
     if(expanded){
       html += `<div style="margin-top:14px;">`;
-      html += `<div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-          <button class="btn-danger" data-remove-cat="${cat.id}">Remove category</button>
-        </div>`;
-
       html += `<div class="entry-type-row"><label>Entry type</label><div class="chip-row" style="margin-bottom:0;">
           <span class="chip etype ${cat.entryType==='individual'?'on':''}" data-etype="individual" data-cat="${cat.id}">Individual (Band + Masquerader + Portrayal)</span>
           <span class="chip etype ${cat.entryType==='group'?'on':''}" data-etype="group" data-cat="${cat.id}">Group (Band + Portrayal only)</span>
@@ -118,6 +114,10 @@ export function renderCategoryCards(ev){
         </div>`;
       });
       html += `<button class="btn btn-outline btn-small" data-add-contestant="${cat.id}">+ Add contestant</button>`;
+      html += `<div class="danger-zone">
+          <div class="danger-zone-label">Danger zone</div>
+          <button class="btn-danger-quiet" data-remove-cat="${cat.id}">Remove category</button>
+        </div>`;
       html += `</div>`;
     }
 

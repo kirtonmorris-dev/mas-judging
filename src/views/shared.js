@@ -26,13 +26,16 @@ export function renderEventPicker(isOrganizer){
   if(isOrganizer){
     html += `<input type="text" id="newEventNameInline" placeholder="New event name (e.g. NY Carnival — J'ouvert)" style="display:none; margin-top:0;">
       <button class="btn btn-primary btn-small" id="createEventInlineBtn" style="display:none; margin-top:8px;">Create event</button>`;
-    html += `<button class="btn btn-danger btn-small" id="removeCurrentEventBtn" style="margin-top:10px; width:100%;">Remove this event</button>`;
     if(!cfg.events.find(e=>e.name==='Baltimore One Carnival 2026 (Historical)')){
       html += '<button class="btn btn-outline btn-small" id="loadBaltimoreHistBtn" style="margin-top:10px; width:100%;">Load Baltimore 2026 historical data from spreadsheet</button>';
     } else {
       html += '<button class="btn btn-outline btn-small" id="fixBaltimoreBtn" style="margin-top:10px; width:100%;">Apply Baltimore score corrections (Adult Female Individual + Non-Costume Band Large)</button>';
     }
     html += '<button class="btn btn-outline btn-small" id="loadWiadcaBtn" style="margin-top:10px; width:100%;">Load WIADCA Junior Carnival data into this event</button>';
+    html += `<div class="danger-zone">
+        <div class="danger-zone-label">Danger zone</div>
+        <button class="btn-danger-quiet" id="removeCurrentEventBtn">Remove this event</button>
+      </div>`;
   }
   html += '</div>';
   return html;
