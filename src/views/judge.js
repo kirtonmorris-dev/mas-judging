@@ -3,7 +3,7 @@ import { render } from '../main.js';
 import { printMyScores } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, entityLabel, escapeAttr, escapeHtml, judgeCategories, scoreKey, sortContestants } from '../utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, draftHasUnsavedWork, entityLabel, escapeAttr, escapeHtml, judgeCategories, scoreKey, sortContestants } from '../utils.js';
 import { renderEventPicker } from '../views/shared.js';
 
 export function renderJudgeMode(){
@@ -87,10 +87,13 @@ export function renderJudgeMode(){
   myContestants.forEach(ct=>{
     const key = scoreKey(ev.id, cat.id, ct.id, state.judge);
     const done = !!state.scores[key];
+    const unsaved = draftHasUnsavedWork(key, cat);
+    const badgeClass = unsaved ? 'draft' : (done ? 'done' : 'pending');
+    const badgeLabel = unsaved ? 'In Progress' : (done ? 'Scored' : 'Pending');
     const stageBadge = ct.stage ? `<span class="badge pending" style="background:#EAEAF0; color:var(--ink-soft);">${escapeHtml(ct.stage)}</span>` : '';
     html += `<div class="contestant-item" data-contestant="${ct.id}">
       <div class="info"><b>${escapeHtml(contestantTitle(cat,ct))}</b><span>${escapeHtml(contestantSubtitle(cat,ct))}</span></div>
-      <span style="display:flex; gap:6px; align-items:center;">${stageBadge}<span class="badge ${done?'done':'pending'}">${done?'Scored':'Pending'}</span></span>
+      <span style="display:flex; gap:6px; align-items:center;">${stageBadge}<span class="badge ${badgeClass}">${badgeLabel}</span></span>
     </div>`;
   });
   html += '</div>';
@@ -122,7 +125,9 @@ export function renderScoringCard(ev, cat, contestant){
     html += `<div class="criterion">
       <div class="top"><span class="name">${escapeHtml(c.label||'(unnamed criterion)')}</span></div>
       <div class="score-input-row">
+        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="-1" aria-label="Decrease ${escapeAttr(c.label||'score')}">&minus;</button>
         <input type="number" inputmode="numeric" min="0" max="${c.max}" value="${val}" data-crit="${c.key}" class="score-input">
+        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="1" aria-label="Increase ${escapeAttr(c.label||'score')}">&plus;</button>
         <span class="score-max">out of ${c.max}</span>
       </div>
     </div>`;
@@ -188,38 +193,50 @@ export function attachJudgeHandlers(){
     printMyScores(ev, cat, state.judge);
   };
 
-  document.querySelectorAll('input.score-input[data-crit]').forEach(el=>{
-    const updateLiveTotal = (cat, key)=>{
+  const scoreCard = document.querySelector('.card.ticket');
+  if(scoreCard){
+    const ev = currentEvent();
+    const cat = ev.categories.find(c=>c.id===state.categoryId);
+    const contestant = cat.contestants.find(c=>c.id===state.contestantId);
+    const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+
+    const updateLiveTotal = ()=>{
       const total = cat.criteria.reduce((s,c)=>s+(state.draft[key][c.key]||0),0);
       const totalEl = document.getElementById('liveTotal');
       if(totalEl) totalEl.textContent = total;
     };
-    el.oninput = (e)=>{
-      const ev = currentEvent();
-      const cat = ev.categories.find(c=>c.id===state.categoryId);
-      const contestant = cat.contestants.find(c=>c.id===state.contestantId);
-      const critKey = e.target.getAttribute('data-crit');
-      let v = parseInt(e.target.value,10);
-      if(isNaN(v)) v = 0;
-      const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
-      state.draft[key][critKey] = v;
-      updateLiveTotal(cat, key);
-    };
-    el.onblur = (e)=>{
-      const ev = currentEvent();
-      const cat = ev.categories.find(c=>c.id===state.categoryId);
-      const contestant = cat.contestants.find(c=>c.id===state.contestantId);
-      const critKey = e.target.getAttribute('data-crit');
+    const setCritValue = (critKey, v)=>{
       const crit = cat.criteria.find(c=>c.key===critKey);
-      let v = parseInt(e.target.value,10);
       if(isNaN(v) || v<0) v = 0;
       if(crit && v>crit.max) v = crit.max;
-      e.target.value = v;
-      const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
       state.draft[key][critKey] = v;
-      updateLiveTotal(cat, key);
+      const input = scoreCard.querySelector(`input.score-input[data-crit="${critKey}"]`);
+      if(input) input.value = v;
+      updateLiveTotal();
     };
-  });
+
+    scoreCard.querySelectorAll('input.score-input[data-crit]').forEach(el=>{
+      el.oninput = (e)=>{
+        const critKey = e.target.getAttribute('data-crit');
+        let v = parseInt(e.target.value,10);
+        if(isNaN(v)) v = 0;
+        state.draft[key][critKey] = v;
+        updateLiveTotal();
+      };
+      el.onblur = (e)=>{
+        const critKey = e.target.getAttribute('data-crit');
+        setCritValue(critKey, parseInt(e.target.value,10));
+      };
+    });
+
+    scoreCard.querySelectorAll('.stepper-btn[data-crit]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const critKey = btn.getAttribute('data-crit');
+        const dir = Number(btn.getAttribute('data-dir'));
+        setCritValue(critKey, (state.draft[key][critKey]||0) + dir);
+      };
+    });
+  }
 
   const submitBtn = document.getElementById('submitScore');
   if(submitBtn) submitBtn.onclick = async ()=>{

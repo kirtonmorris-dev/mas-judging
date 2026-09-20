@@ -85,14 +85,21 @@
   .badge{ font-size:0.7rem; font-weight:700; padding:4px 9px; border-radius:999px; white-space:nowrap; }
   .badge.done{ background:#DFF0E4; color:var(--green); }
   .badge.pending{ background:#F3E7D0; color:var(--gold); }
+  .badge.draft{ background:#E3E8FA; color:#4C5FA6; }
 
   .criterion{ margin-bottom:16px; }
   .criterion .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
   .criterion .top .name{ font-weight:700; font-size:0.92rem; color:var(--ink); }
   .criterion .top .val{ font-family:'Bebas Neue'; font-size:1.5rem; color:var(--gold); }
-  .score-input-row{ display:flex; align-items:center; gap:10px; }
-  .score-input{ width:90px; padding:12px; border-radius:10px; border:1.5px solid var(--line); font-family:'Bebas Neue'; font-size:1.6rem; color:var(--ink); background:#fff; text-align:center; min-height:44px; }
+  .score-input-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .score-input{ width:70px; padding:12px; border-radius:10px; border:1.5px solid var(--line); font-family:'Bebas Neue'; font-size:1.6rem; color:var(--ink); background:#fff; text-align:center; min-height:44px; }
   .score-max{ font-size:0.85rem; color:var(--ink-soft); }
+  .stepper-btn{
+    width:44px; height:44px; flex:0 0 44px; padding:0; border-radius:10px; border:1.5px solid var(--line);
+    background:#fff; color:var(--ink); font-size:1.4rem; font-weight:700; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stepper-btn:active{ background:var(--gold); border-color:var(--gold); color:var(--ink); }
   input[type=range]{ width:100%; accent-color: var(--gold); height:28px; }
 
   .score-bar-spacer{ height:88px; }
