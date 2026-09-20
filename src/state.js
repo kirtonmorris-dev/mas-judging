@@ -12,6 +12,7 @@ export let state = {
   draft: {},
   expandedCats: {},
   categoryFilter: '',
+  contestantFilters: {},
   orgEditKey: null,
   orgEditDraft: {},
   expandedCompetitionSettings: false,

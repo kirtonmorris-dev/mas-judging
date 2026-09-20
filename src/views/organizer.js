@@ -255,6 +255,9 @@ export function attachOrganizerHandlers(){
   document.querySelectorAll('[data-remove-judge]').forEach(el=>{
     el.onclick = async ()=>{
       const name = el.getAttribute('data-remove-judge');
+      const judgeObj = ev.judges.find(j=>j.name===name);
+      const label = judgeObj ? `${judgeObj.realName || judgeObj.name} (${name})` : name;
+      if(!confirm(`Remove judge "${label}"? They will be unassigned from every entry across all categories. This cannot be undone.`)) return;
       ev.judges = ev.judges.filter(j=>j.name!==name);
       ev.categories.forEach(cat=>{
         cat.contestants.forEach(ct=>{ ct.assignedJudges = ct.assignedJudges.filter(n=>n!==name); });
