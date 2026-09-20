@@ -249,25 +249,12 @@ export function attachJudgeHandlers(){
     submitBtn.textContent = 'Saving\u2026';
     const ok = await saveScoreEntry(key, entry);
     if(ok){
-      const { nextId, remaining } = findNextUnscored(ev, cat, contestant.id);
-      showToast('Score saved for ' + contestantTitle(cat, contestant) + (remaining ? ` — ${remaining} remaining` : ' — all done!'));
-      state.contestantId = nextId;
+      showToast('Score saved for ' + contestantTitle(cat, contestant));
+      state.contestantId = null;
       render();
     } else {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Submit score';
     }
   };
-}
-
-// Finds the next contestant (in list order, wrapping around) this judge hasn't
-// scored yet, so submitting can advance straight into the next scoring card
-// instead of dropping back to the full list every time. nextId is null once
-// everything's scored.
-function findNextUnscored(ev, cat, justScoredId){
-  const myContestants = sortContestants(cat, cat.contestants.filter(ct => ct.assignedJudges.includes(state.judge)));
-  const startIdx = myContestants.findIndex(c => c.id === justScoredId);
-  const ordered = [...myContestants.slice(startIdx + 1), ...myContestants.slice(0, startIdx + 1)];
-  const unscored = ordered.filter(c => !state.scores[scoreKey(ev.id, cat.id, c.id, state.judge)]);
-  return { nextId: unscored.length ? unscored[0].id : null, remaining: unscored.length };
 }
