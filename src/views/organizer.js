@@ -292,7 +292,13 @@ export function attachOrganizerHandlers(){
       });
       if(added===0){
         statusEl.className = 'import-status err';
-        statusEl.textContent = 'No new judges imported. Check that a Name column exists and is filled in.';
+        if(duplicates>0 && skipped===0){
+          statusEl.textContent = `No new judges imported. All ${duplicates} name(s) in that file are already on the list.`;
+        } else if(duplicates>0){
+          statusEl.textContent = `No new judges imported. ${duplicates} name(s) already on the list, ${skipped} row(s) missing a name.`;
+        } else {
+          statusEl.textContent = 'No new judges imported. Check that a Name column exists and is filled in.';
+        }
       } else {
         await saveConfig();
         let msg = `Imported ${added} judge${added!==1?'s':''}`;
