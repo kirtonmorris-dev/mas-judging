@@ -245,6 +245,8 @@ export function attachOrganizerHandlers(){
     const input = document.getElementById('setupNewJudge');
     const realName = input.value.trim();
     if(!realName) return;
+    const dup = ev.judges.some(j=>(j.realName||'').trim().toLowerCase() === realName.toLowerCase());
+    if(dup){ showToast(`"${realName}" is already on the judges list`, true); return; }
     const nums = ev.judges.map(j=>{ const m = /^Judge\s+(\d+)$/i.exec(j.name||''); return m ? parseInt(m[1],10) : 0; });
     const nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
     const maskedName = 'Judge ' + nextNum;
@@ -252,6 +254,75 @@ export function attachOrganizerHandlers(){
     await saveConfig();
     render();
   };
+  const toggleJudgeUploadBtn = document.getElementById('setupToggleJudgeUpload');
+  if(toggleJudgeUploadBtn) toggleJudgeUploadBtn.onclick = ()=>{
+    const box = document.getElementById('judgeUploadBox');
+    if(box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  };
+
+  const judgeImportFile = document.getElementById('judgeImportFile');
+  if(judgeImportFile) judgeImportFile.onchange = async (e)=>{
+    const statusEl = document.getElementById('judgeImportStatus');
+    const file = e.target.files[0];
+    if(!file) return;
+    statusEl.className = 'import-status';
+    statusEl.textContent = 'Reading file…';
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      const existing = new Set(ev.judges.map(j=>(j.realName||'').trim().toLowerCase()));
+      const seenInFile = new Set();
+      const nums = ev.judges.map(j=>{ const m = /^Judge\s+(\d+)$/i.exec(j.name||''); return m ? parseInt(m[1],10) : 0; });
+      let nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
+      let added = 0, skipped = 0, duplicates = 0;
+      rows.forEach(row=>{
+        let realName = '';
+        Object.keys(row).forEach(k=>{
+          const key = k.toString().trim().toLowerCase();
+          const val = (row[k]??'').toString().trim();
+          if(!realName && ['name','judge','judge name','real name'].includes(key)) realName = val;
+        });
+        if(!realName){ skipped++; return; }
+        const norm = realName.toLowerCase();
+        if(existing.has(norm) || seenInFile.has(norm)){ duplicates++; return; }
+        seenInFile.add(norm);
+        ev.judges.push({name: 'Judge ' + nextNum, realName, pin:null});
+        nextNum++;
+        added++;
+      });
+      if(added===0){
+        statusEl.className = 'import-status err';
+        if(duplicates>0 && skipped===0){
+          statusEl.textContent = `No new judges imported. All ${duplicates} name(s) in that file are already on the list.`;
+        } else if(duplicates>0){
+          statusEl.textContent = `No new judges imported. ${duplicates} name(s) already on the list, ${skipped} row(s) missing a name.`;
+        } else {
+          statusEl.textContent = 'No new judges imported. Check that a Name column exists and is filled in.';
+        }
+      } else {
+        await saveConfig();
+        let msg = `Imported ${added} judge${added!==1?'s':''}`;
+        if(duplicates) msg += `. Skipped ${duplicates} already on the list`;
+        if(skipped) msg += `. Skipped ${skipped} row(s) missing a name`;
+        statusEl.className = 'import-status ok';
+        statusEl.textContent = msg;
+        showToast(msg);
+        render();
+        const box = document.getElementById('judgeUploadBox');
+        if(box) box.style.display = 'block';
+        const newStatusEl = document.getElementById('judgeImportStatus');
+        if(newStatusEl){ newStatusEl.className = 'import-status ok'; newStatusEl.textContent = msg; }
+      }
+    }catch(err){
+      console.error('judge import failed', err);
+      statusEl.className = 'import-status err';
+      statusEl.textContent = 'Could not read that file. Try exporting as .csv or .xlsx.';
+    }
+    e.target.value = '';
+  };
+
   document.querySelectorAll('[data-remove-judge]').forEach(el=>{
     el.onclick = async ()=>{
       const name = el.getAttribute('data-remove-judge');
