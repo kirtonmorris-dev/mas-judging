@@ -1,4 +1,4 @@
-/* Carnival Judging — Live Scoring for Every Competition
+/* Judge D Show — Live Scoring for Every Competition
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
 import { fetchScores, loadAll } from './api.js';
 import { state } from './state.js';

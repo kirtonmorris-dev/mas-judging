@@ -1,4 +1,4 @@
-# Carnival Judging (rebranding to "Judge D Show") — Project Context
+# Judge D Show (formerly "Carnival Judging") — Project Context
 
 This file exists so any future Claude Code session (or human) picking up this
 project has the background needed to work on it safely. Read this before
@@ -20,11 +20,13 @@ Carnival both run live scoring on it. A Panorama competition ("Testing -
 Panorama") is set up as a sandbox/test event — safe to use for any live
 testing that needs real data without touching real events.
 
-**Branding in flux**: the app is being renamed from "Carnival Judging" to
-**"Judge D Show"** (domain `judgedshow.com`, defensive alt `judgedeshow.com`).
-As of this writing the rename is a *decision*, not yet applied in code —
-`index.html`/`README.md`/`CONTEXT.md` still say "Carnival Judging." See
-"Pending business/marketing items" below.
+**Branding**: the app was renamed from "Carnival Judging" to **"Judge D
+Show"** (domain `judgedshow.com`, defensive alt `judgedeshow.com`). The
+rename is applied throughout user-facing text and code comments/doc
+references (`index.html`, `README.md`, `src/main.js` header comment,
+`scripts/stress-test.mjs` comment, this file). Domain purchase and the
+background-visual redesign are still open — see "Pending business/marketing
+items" below.
 
 ## Architecture
 
@@ -208,12 +210,13 @@ changes.
 
 ## Pending business/marketing items (not code, but relevant context)
 
-- **Name change to "Judge D Show" is decided but not yet implemented in
-  code.** Someone picking this up should update `index.html` (title/h1/
-  tagline), `src/main.js` header comment, `README.md`, and this file, the
-  same way the earlier rename from "Mas Judging" → "Carnival Judging" was
-  done (see git log on `main` for that pattern: feature branch → preview →
-  merge).
+- **Name change to "Judge D Show" is done in code** (`index.html`, `README.md`,
+  `src/main.js` header comment, `scripts/stress-test.mjs` comment, this
+  file) — same pattern as the earlier rename from "Mas Judging" →
+  "Carnival Judging" (see git log on `main`). Still outstanding: the
+  `judgedshow.com`/`judgedeshow.com` domain purchase and pointing DNS at
+  Vercel, and updating any off-repo references (social profiles, app store
+  listings if any, etc.) — none tracked in this codebase.
 - **Domain purchase**: `judgedshow.com` (primary) + `judgedeshow.com`
   (defensive alt), ~$11.25/yr each. A Google Calendar reminder is set for
   Tuesday 2026-09-22. The user's existing domain
