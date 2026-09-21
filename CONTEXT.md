@@ -45,13 +45,29 @@ judging app isn't the first thing a prospect hits:
   flows, everything described below). This *is* what used to live at the
   repo root before the marketing page existed. It carries a
   `<meta name="robots" content="noindex">` tag so the PIN-entry screen
-  doesn't show up in search results. All internal references are
-  relative paths (`styles.css`, `src/main.js`, `./api.js`, etc.) — there
-  were no absolute `/`-rooted paths or Supabase Auth callback URLs
-  anywhere in the app, so the move to `/app` needed zero internal link
-  changes, just relocating the files.
+  doesn't show up in search results.
 - No `vercel.json` exists or is needed — Vercel's static file serving
-  picks up `/app/index.html` for requests to `/app` automatically.
+  picks up `/app/index.html` for requests to `/app` automatically, and
+  does **not** redirect `/app` to `/app/` (no trailing slash added).
+- **`app/index.html`'s top-level `<link href>`/`<script src>` are
+  origin-absolute (`/app/styles.css`, `/app/src/main.js`), not relative.**
+  This was a real shipped bug during the root→`/app` move: with the
+  document served at the trailing-slash-less URL `/app`, a *relative*
+  reference like `href="styles.css"` resolves against `/` (the parent of
+  the URL's last path segment), not `/app/` — so the browser was actually
+  requesting `/styles.css` and `/src/main.js`, both 404, and the app's
+  module script never ran at all. Production was stuck on the static
+  "Loading scoresheet…" shell (unstyled, since the CSS 404'd too) for
+  real users until this was caught and fixed. Nested ES module imports
+  *inside* `src/main.js` (e.g. `import ... from './api.js'`) are fine as
+  relative paths — module specifiers resolve against the *importing
+  module's own URL*, not the document's — it is specifically the
+  document's own top-level `<link>`/`<script src>` tags that need to be
+  absolute. If `/app`'s assets ever move again, keep these absolute or
+  add a `vercel.json` redirect from `/app` to `/app/` and verify the
+  fix by loading the page in a real browser (or curl -IL following
+  redirects), not just by fetching hand-constructed absolute file paths
+  — that's how this slipped through review the first time.
 - **Known tradeoff**: existing judges/organizers (WIADCA, Baltimore) who
   bookmarked the old root URL will land on the marketing page after this
   ships, not the login screen. Decided explicitly: no login link was
