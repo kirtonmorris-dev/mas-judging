@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Unattended stress/concurrency test for the Carnival Judging Supabase backend.
+ * Unattended stress/concurrency test for the Judge D Show Supabase backend.
  *
  * Exercises the exact REST/RPC calls src/api.js makes (upsert scores, replace_config,
  * fetchScores) at real concurrency, entirely against a disposable synthetic event
