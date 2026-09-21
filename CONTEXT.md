@@ -188,6 +188,24 @@ Collapsible sections (category cards, competition settings) and a
 category-name filter already existed before this session and needed no
 changes.
 
+4. **Bulk judge import via CSV/Excel** (`src/views/setup.js`,
+   `src/views/organizer.js`): an "Upload list…" button next to the
+   existing manual "Add judge" row expands a file picker
+   (`#judgeUploadBox`, `.xlsx`/`.xls`/`.csv` via SheetJS, same pattern as
+   the existing contestant workbook import). It reads a column named
+   Name/Judge/"Judge Name"/"Real Name" (case-insensitive), skips rows
+   with no name, skips names already on the event's judges list or
+   repeated within the file (case-insensitive), and assigns each new name
+   the next "Judge N" slot — PIN is still self-set on first login, same
+   as manual add. The status line + toast distinguish "no name column /
+   all rows blank" from "all names already on the list" so the message
+   is actually accurate, and the status line is explicitly restored after
+   the `render()` call (which would otherwise wipe it instantly). The
+   manual single-add path (`setupAddJudge`) now shares the same
+   case-insensitive duplicate check — it used to accept a re-typed
+   existing name and silently create a second "Judge N" for the same
+   person.
+
 ## Pending business/marketing items (not code, but relevant context)
 
 - **Name change to "Judge D Show" is decided but not yet implemented in
