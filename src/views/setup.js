@@ -16,7 +16,13 @@ export function renderSetup(ev){
       ${hasPin?`<button class="reset" data-reset-pin="${escapeAttr(j.name)}">reset</button>`:''}
       <button data-remove-judge="${escapeAttr(j.name)}">&times;</button></span>`;
   });
-  html += '</div><div class="row"><input type="text" id="setupNewJudge" placeholder="Add judge (real name, kept private)"><button class="btn btn-outline btn-small" id="setupAddJudge" style="flex:0 0 auto;">Add</button></div>'
+  html += '</div><div class="row"><input type="text" id="setupNewJudge" placeholder="Add judge (real name, kept private)"><button class="btn btn-outline btn-small" id="setupAddJudge" style="flex:0 0 auto;">Add</button><button class="btn btn-outline btn-small" id="setupToggleJudgeUpload" style="flex:0 0 auto;">Upload list&hellip;</button></div>'
+    + `<div id="judgeUploadBox" class="import-box" style="display:none; margin-top:10px;">
+        <label>Upload judges from a spreadsheet</label>
+        <input type="file" accept=".xlsx,.xls,.csv" id="judgeImportFile">
+        <div class="small-note" style="margin-top:8px; text-align:left;">First row = headers. One column with a name like <b>Name</b> or <b>Judge</b> (case-insensitive) — the rest of the file is ignored. Each new name gets the next "Judge N" slot and sets a PIN the first time they log in, same as adding one at a time. Names already on the list, and repeated names within the file, are skipped. Adds to the list, doesn't replace it.</div>
+        <div class="import-status" id="judgeImportStatus"></div>
+      </div>`
     + '<div class="small-note" style="margin-top:8px; text-align:left;">Judges appear here by real name so you can keep track of who\'s who. Everywhere else in the app — Live Tally, Judge Detail, printed sheets, and the Judge tab — they only ever show as "Judge 1", "Judge 2", etc. Tell each judge their number privately so they can find their slot under the Judge tab.</div>'
     + '</div>';
 
