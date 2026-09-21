@@ -302,11 +302,11 @@ export function attachOrganizerHandlers(){
       } else {
         await saveConfig();
         let msg = `Imported ${added} judge${added!==1?'s':''}`;
-        if(duplicates) msg += `. Skipped ${duplicates} duplicate name(s)`;
+        if(duplicates) msg += `. Skipped ${duplicates} already on the list`;
         if(skipped) msg += `. Skipped ${skipped} row(s) missing a name`;
         statusEl.className = 'import-status ok';
         statusEl.textContent = msg;
-        showToast(`Imported ${added} judge${added!==1?'s':''}`);
+        showToast(msg);
         render();
       }
     }catch(err){
