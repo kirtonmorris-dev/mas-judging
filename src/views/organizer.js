@@ -245,6 +245,8 @@ export function attachOrganizerHandlers(){
     const input = document.getElementById('setupNewJudge');
     const realName = input.value.trim();
     if(!realName) return;
+    const dup = ev.judges.some(j=>(j.realName||'').trim().toLowerCase() === realName.toLowerCase());
+    if(dup){ showToast(`"${realName}" is already on the judges list`, true); return; }
     const nums = ev.judges.map(j=>{ const m = /^Judge\s+(\d+)$/i.exec(j.name||''); return m ? parseInt(m[1],10) : 0; });
     const nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
     const maskedName = 'Judge ' + nextNum;
