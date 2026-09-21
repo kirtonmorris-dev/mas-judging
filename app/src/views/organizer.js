@@ -14,7 +14,7 @@ import { renderTally } from '../views/tally.js';
 
 export function renderPinGate(){
   return `<div class="pin-wrap">
-    <div class="section-title" style="color:var(--card);">Organizer access</div>
+    <div class="section-title" style="color:var(--ink);">Organizer access</div>
     <input type="text" id="pinInput" placeholder="PIN" inputmode="numeric" maxlength="8" style="max-width:180px; margin:0 auto 12px;">
     <br><button class="btn btn-primary" id="pinSubmit" style="max-width:180px;">Unlock</button>
     <div id="pinErr" class="err" style="display:none; max-width:260px; margin:14px auto 0;">Incorrect PIN. Ask Kirt for the organizer PIN.</div>
