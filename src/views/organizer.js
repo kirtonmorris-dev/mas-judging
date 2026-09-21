@@ -308,6 +308,10 @@ export function attachOrganizerHandlers(){
         statusEl.textContent = msg;
         showToast(msg);
         render();
+        const box = document.getElementById('judgeUploadBox');
+        if(box) box.style.display = 'block';
+        const newStatusEl = document.getElementById('judgeImportStatus');
+        if(newStatusEl){ newStatusEl.className = 'import-status ok'; newStatusEl.textContent = msg; }
       }
     }catch(err){
       console.error('judge import failed', err);
