@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Judge D Show — Live Scoring for Every Competition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="pennants" id="pennants"></div>
+<div id="connBanner" class="conn-banner" style="display:none;">You're offline &mdash; scores won't save until you reconnect.</div>
+<header>
+  <h1 class="display">Judge D Show</h1>
+  <p>Live Scoring for Every Competition</p>
+</header>
+
+<div class="container">
+  <div class="modebar">
+    <button id="tabJudge" class="active">Judge</button>
+    <button id="tabOrganizer">Organizer</button>
+  </div>
+
+  <div id="loadingMsg" class="empty">Loading scoresheet&hellip;</div>
+  <div id="app" style="display:none;"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="printArea" class="print-only"></div>
+
+<footer style="text-align:center; padding:24px 16px 40px; color:#8B96A6; font-size:0.72rem; letter-spacing:0.02em;">
+  &copy; 2026 <a href="https://www.immortelleadvisorygroup.com/" target="_blank" rel="noopener" style="color:#8B96A6; text-decoration:underline;">Immortelle Advisory Group</a>. Built by Kirt Morris, Founder &amp; Principal Consultant.
+</footer>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

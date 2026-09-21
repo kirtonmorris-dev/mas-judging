@@ -28,15 +28,48 @@ references (`index.html`, `README.md`, `src/main.js` header comment,
 background-visual redesign are still open — see "Pending business/marketing
 items" below.
 
+## URL structure — marketing site vs. the app
+
+The repo root now serves **two separate static pages**, split so the
+judging app isn't the first thing a prospect hits:
+
+- **`/` (repo root `index.html`)** — the marketing/landing page. A
+  self-contained static page (own inline styles, own fonts — Fraunces +
+  IBM Plex Sans, distinct from the app's Bebas Neue + Inter), anchor
+  links to its own sections, "Book a Call"/"Request a Quote" buttons to
+  Calendly. **Do not wire this into the app** — no Supabase, no judging
+  logic, nothing beyond static content and anchor links to itself. It is
+  indexed by search engines (no robots meta tag).
+- **`/app` (`app/index.html`, `app/styles.css`, `app/src/`)** — the
+  actual judging app (PIN login, judge scoring, organizer tally, print
+  flows, everything described below). This *is* what used to live at the
+  repo root before the marketing page existed. It carries a
+  `<meta name="robots" content="noindex">` tag so the PIN-entry screen
+  doesn't show up in search results. All internal references are
+  relative paths (`styles.css`, `src/main.js`, `./api.js`, etc.) — there
+  were no absolute `/`-rooted paths or Supabase Auth callback URLs
+  anywhere in the app, so the move to `/app` needed zero internal link
+  changes, just relocating the files.
+- No `vercel.json` exists or is needed — Vercel's static file serving
+  picks up `/app/index.html` for requests to `/app` automatically.
+- **Known tradeoff**: existing judges/organizers (WIADCA, Baltimore) who
+  bookmarked the old root URL will land on the marketing page after this
+  ships, not the login screen. Decided explicitly: no login link was
+  added to the marketing page nav, and the plan is to message the new
+  `/app` URL to those organizers directly rather than add navigation
+  clutter to the marketing page. Keep this in mind before pointing the
+  `judgedshow.com` domain — decide whether the domain root goes to `/`
+  (marketing) or `/app` (straight to login) once purchased.
+
 ## Architecture
 
 - **Modular vanilla JS, ES modules**, no build step, no framework, no
-  bundler. Entry point `index.html` loads `src/main.js` as `type="module"`.
-  Source is organized under `src/`: `api.js` (all Supabase I/O), `state.js`
-  (single mutable state object), `views/` (judge.js, organizer.js, setup.js,
-  tally.js, judgeDetail.js, shared.js), `utils.js`, `constants.js`,
-  `competitionLibrary.js`, `historicalLoaders.js`, `importParsers.js`,
-  `print.js`, `ui.js`.
+  bundler. Entry point `app/index.html` loads `app/src/main.js` as
+  `type="module"`. Source is organized under `app/src/`: `api.js` (all
+  Supabase I/O), `state.js` (single mutable state object), `views/`
+  (judge.js, organizer.js, setup.js, tally.js, judgeDetail.js,
+  shared.js), `utils.js`, `constants.js`, `competitionLibrary.js`,
+  `historicalLoaders.js`, `importParsers.js`, `print.js`, `ui.js`.
 - **External library**: SheetJS (xlsx), loaded from cdnjs.cloudflare.com,
   for reading uploaded Excel files.
 - **Fonts**: Google Fonts (Bebas Neue + Inter).
@@ -51,7 +84,10 @@ items" below.
 ## Deployment
 
 - **Hosting**: Vercel, project `mas-judging`, team `kirt-morris-projects`.
-- **Live URL**: https://mas-judging-kirt-morris-projects.vercel.app
+- **Live URLs**: marketing page at
+  https://mas-judging-kirt-morris-projects.vercel.app/, the app at
+  https://mas-judging-kirt-morris-projects.vercel.app/app (see "URL
+  structure" above).
 - **Git-push-to-deploy IS wired up**: pushing a feature branch to
   `kirtonmorris-dev/mas-judging` on GitHub triggers a Vercel *preview*
   deploy; pushing/merging to `main` triggers a *production* deploy.
@@ -171,7 +207,7 @@ every other judge's real name.
    unsubmitted draft (`draftHasUnsavedWork` in `utils.js`). Auto-advance to
    the next contestant after submit was tried and **explicitly rejected**
    by the user — bands don't perform in list order, so don't reintroduce it.
-2. **Feedback & error states** (`src/api.js`, `src/ui.js`, `index.html`):
+2. **Feedback & error states** (`src/api.js`, `src/ui.js`, `app/index.html`):
    every "Save failed" toast now embeds a Retry button that re-runs the
    exact same save (`showToast(msg, isErr, retryFn)`); error toasts stay
    up longer (3.2s/6s vs 1.8s for success); a proactive offline banner
