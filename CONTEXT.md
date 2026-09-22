@@ -2,7 +2,7 @@
 
 This file exists so any future Claude Code session (or human) picking up this
 project has the background needed to work on it safely. Read this before
-making changes. It reflects the state as of 2026-09-21 — if things look
+making changes. It reflects the state as of 2026-09-22 — if things look
 different, trust the code over this file and update this file.
 
 ## What this is
@@ -19,6 +19,21 @@ Real current users: WIADCA Junior Carnival (Brooklyn) and Baltimore One
 Carnival both run live scoring on it. A Panorama competition ("Testing -
 Panorama") is set up as a sandbox/test event — safe to use for any live
 testing that needs real data without touching real events.
+
+**Data discrepancy found 2026-09-22, not yet resolved**: as of this date,
+Supabase only has three events — `Testing - Panorama` (sandbox), `West
+Indian American Day Carnival Association — Junior Carnival` (real data: 6
+judges, 5 categories, 49 contestants, 58 scores submitted), and `WIADCA -
+Monday Mas` (3 judges added, but zero categories/contestants/scores — never
+actually run). **There is no Baltimore One Carnival event in this database
+at all.** Marketing copy was updated this session to state only the
+verified WIADCA-derived counts (referred to publicly as "an NYC Carnival
+competition," per the existing no-named-orgs-without-permission rule) and
+to keep the Baltimore claim intentionally vague rather than inventing
+numbers for it — see "Marketing site work shipped this session" below. If
+Baltimore's real event data lives in a different Supabase project, a
+spreadsheet, or hasn't been entered yet, find out which before citing any
+Baltimore-specific numbers publicly.
 
 **Branding**: the app was renamed from "Carnival Judging" to **"Judge D
 Show"** (domain `judgedshow.com`, defensive alt `judgedeshow.com`). The
@@ -96,6 +111,12 @@ judging app isn't the first thing a prospect hits:
   against a disposable synthetic event. Run with `node scripts/stress-test.mjs`
   before a live event or after any backend change. Last run: 20 concurrent
   judges, 600 writes, zero errors.
+- **Image assets**: a root-level `images/` folder (referenced as
+  `/images/...` from `index.html`, following the same origin-absolute
+  convention as `/app`'s assets) holds marketing-page images —
+  `kirt-headshot.jpg`, `judge-pin-entry.png`, `organizer-setup.png`,
+  `judge-scoring-list.png` (saved, not yet used). Follow this convention
+  for new marketing-page images rather than inventing a new folder.
 
 ## Deployment
 
@@ -260,6 +281,87 @@ changes.
    existing name and silently create a second "Judge N" for the same
    person.
 
+## Marketing site + app work shipped 2026-09-22 (all merged to `main`)
+
+1. **Offline claim corrected** (`index.html`, "Why It's Different"): the
+   section previously claimed "automatic retry" and implied scoring
+   continues uninterrupted offline. Neither is true — there's no local
+   draft persistence and no automatic sync. Rewrote the copy to match
+   actual behavior: the app detects offline state and warns immediately,
+   and a failed save gets a one-tap manual retry once reconnected. This
+   was an explicit **Option A (copy fix only)** decision, not Option B
+   (building real offline queueing) — don't restore stronger offline
+   language without actually building that first.
+2. **Founder trust section added** (`index.html`, between "Why It's
+   Different" and "Where It's Been Used"): 3-sentence bio using Kirt's
+   verified background (25+ years enterprise delivery, P&G/Under
+   Armour/Lowe's/Canon USA via Merkle/dentsu and Capgemini Ernst & Young),
+   with his real headshot (`images/kirt-headshot.jpg`, cropped square with
+   headroom above the hairline — the source photo is portrait-oriented and
+   naive `object-fit: cover` in a circle clipped the top of his head) linked
+   to `immortelleadvisorygroup.com`.
+3. **Proof section rewritten with real numbers** (`index.html`, "Where
+   It's Been Used"): see the Baltimore data-discrepancy note above for why
+   only WIADCA-derived counts are cited, and unnamed ("an NYC Carnival
+   competition").
+4. **FAQ section added** (`index.html`, between Proof and Pricing): 26
+   Q&As, 9 shown by default with a "Show all questions" toggle revealing
+   the rest in place. Dependency-free accordion (button +
+   aria-expanded/aria-controls region, single-open-at-a-time,
+   `prefers-reduced-motion` aware, grid-template-rows animation). Content
+   is restricted to verified facts — no export/CSV claims, no
+   weighting/multi-round-averaging claims, no security claims beyond
+   PIN-gated access, and the connectivity answers match the Option-A
+   offline copy above (no automatic-sync claim).
+5. **Category list promoted to its own section** (`index.html`, right
+   after "How It Works"): the 11 supported competition types used to
+   render as low-contrast pills inside the dark "Why It's Different"
+   section; now their own white-background section with navy-on-white
+   pills for real contrast. Same content, relocated and restyled only.
+6. **"On call" copy rewritten** (`index.html`, "Why It's Different"): now
+   states Kirt is present in person on event night, not just reachable by
+   phone/WhatsApp.
+7. **Illustrative app-preview mockups replaced with real screenshots**
+   (`index.html`, "How It Works" preview section; images in `images/`):
+   the hand-coded fake "Judge View" phone-frame and fake "Organizer View"
+   live-tally card are gone. The narrow phone-silhouette frame didn't fit
+   a real landscape browser screenshot without cropping or illegible
+   shrinking (confirmed directly), so both columns now use the same
+   bordered screenshot-card style. Left column: `images/judge-pin-entry.png`
+   (PIN entry screen, Testing - Panorama sandbox). Right column:
+   `images/organizer-setup.png` (Setup tab showing judges by real name next
+   to their masked "Judge N" label and PIN status — showing real names
+   here is a deliberate, explicitly confirmed decision, not an accident;
+   the underlying judge-blinding design elsewhere in the app is unchanged).
+   `images/judge-scoring-list.png` (the judge's "Your Bands" list) was also
+   saved but is **not yet used on the page** — held for a future
+   three-image layout, confirmed directly rather than forcing an
+   unplanned redesign.
+8. **Score-edit history surfaced in the organizer UI** (`app/src/api.js`,
+   `app/src/views/tally.js`, `app/src/views/organizer.js`,
+   `app/src/print.js`, `app/src/utils.js`): `score_history` rows were
+   already logged but nothing showed them. Live Tally now has a "View
+   edit history" button per category (lists what changed, when, and
+   whether it was a judge submission or an organizer correction via
+   `fetchScoreHistoryForCategory`), plus a warning badge when a category
+   has been edited by the organizer since its sign-off sheet was last
+   printed. "Last printed" is tracked **client-side, per browser, in
+   `localStorage`** (`getLastPrintedAt`/`setLastPrintedAt` in `utils.js`,
+   set from `print.js`'s `printSignoffSheet`/`printAllSignoffSheets`) —
+   it's visibility only, not authoritative across devices, and
+   deliberately does **not** lock or restrict further edits. No lock/freeze
+   mechanism was added; that remains an intentionally-not-built decision
+   (see below).
+9. **Judge score-submission confirmation** (`app/src/views/judge.js`,
+   `app/src/ui.js`): submitting a score now shows an "Undo" action on its
+   success toast (`showToast` extended with a generic `actionFn`/
+   `actionLabel` param, reused for both "Retry" and "Undo") for about 6
+   seconds before being final. The save still persists immediately as
+   before — there's no delayed/queued write that could be lost if a
+   device closes early — Undo reverts via `saveScoresMerge` to the prior
+   value (or deletes the row if it was a new submission). This was chosen
+   over a double-tap-to-confirm pattern.
+
 ## Pending business/marketing items (not code, but relevant context)
 
 - **Name change to "Judge D Show" is done in code** (`index.html`, `README.md`,
@@ -290,6 +392,15 @@ changes.
   Coast/Caribbean outreach strategy, and competitor market analysis) was
   drafted for a *separate* Claude chat — this is business/marketing work,
   not something to do inside this coding session unless asked.
+- **Marketing-page audit (2026-09-22) is done**: a full pass covering the
+  offline claim, founder section, proof numbers, FAQ, category-list
+  placement, "on call" copy, and real screenshots all shipped this
+  session — see "Marketing site + app work shipped 2026-09-22" above. The
+  one item deliberately left undone: the judge's scoring-list screenshot
+  (`images/judge-scoring-list.png`) is saved but not placed on the page;
+  adding it means either a 3-column/stacked-row redesign of the app-preview
+  section or dropping one of the two current screenshots — a layout call
+  for whoever picks this up next, not something to decide unilaterally.
 
 ## Print flows
 
