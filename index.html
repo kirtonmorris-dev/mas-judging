@@ -27,6 +27,39 @@
     .jds-nav-inner { padding: 16px 20px !important; }
     h1 { font-size: 34px !important; }
   }
+
+  /* FAQ accordion */
+  .faq-item { border-bottom: 1px solid rgba(20,24,31,0.12); }
+  .faq-trigger {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    min-height: 44px;
+    padding: 18px 4px;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: #14181F;
+  }
+  .faq-trigger:focus-visible { outline: 2px solid #E8A33D; outline-offset: 2px; border-radius: 4px; }
+  .faq-icon { position: relative; width: 16px; height: 16px; flex-shrink: 0; }
+  .faq-icon-h, .faq-icon-v { position: absolute; background: #E8A33D; border-radius: 1px; top: 50%; left: 50%; }
+  .faq-icon-h { width: 16px; height: 2px; margin-top: -1px; margin-left: -8px; }
+  .faq-icon-v { width: 2px; height: 16px; margin-top: -8px; margin-left: -1px; transition: transform 0.18s ease; }
+  .faq-trigger[aria-expanded="true"] .faq-icon-v { transform: rotate(90deg); }
+  .faq-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.18s ease; }
+  .faq-panel.faq-panel-open { grid-template-rows: 1fr; }
+  .faq-panel-inner { overflow: hidden; }
+  .faq-panel-inner p { margin: 0 4px 18px; font-size: 15px; line-height: 1.6; color: rgba(20,24,31,0.7); }
+  #faqShowAllBtn { all: unset; box-sizing: border-box; display: block; margin: 24px auto 0; padding: 12px 24px; border: 1.5px solid rgba(20,24,31,0.25); border-radius: 8px; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; min-height: 44px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-icon-v, .faq-panel { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -40,6 +73,7 @@
       <div style="display: flex; align-items: center; gap: 32px; flex-wrap: wrap;">
         <a href="#how-it-works" style="font-size: 15px; font-weight: 500;">How It Works</a>
         <a href="#built-different" style="font-size: 15px; font-weight: 500;">Why It's Different</a>
+        <a href="#faq" style="font-size: 15px; font-weight: 500;">FAQ</a>
         <a href="#pricing" style="font-size: 15px; font-weight: 500;">Pricing</a>
         <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #14181F; color: #F7F5F0; padding: 10px 20px; border-radius: 8px; font-size: 15px; font-weight: 600;">Book a Call</a>
       </div>
@@ -244,6 +278,360 @@
     </div>
   </div>
 
+  <!-- FAQ -->
+  <div id="faq" class="jds-pad-lg" style="width: 100%; background: #FFFFFF; padding: 88px 40px; border-bottom: 1px solid rgba(20,24,31,0.08);">
+    <div style="max-width: 780px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 48px;">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #E8A33D; margin-bottom: 12px;">FAQ</div>
+        <h2 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 34px; line-height: 1.2;">Questions worth asking before you commit.</h2>
+      </div>
+
+      <div id="faqList">
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-1" aria-expanded="false" aria-controls="faq-a-1">
+            <span>What is Judge D Show?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-1" class="faq-panel" role="region" aria-labelledby="faq-q-1" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show is a digital judging and scoring platform built specifically for Carnival competitions. It replaces paper scoring and manual tallying with a system where judges score digitally and organizers watch results come in and manage the process.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-2" aria-expanded="false" aria-controls="faq-a-2">
+            <span>Does Judge D Show replace the judges?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-2" class="faq-panel" role="region" aria-labelledby="faq-q-2" hidden>
+          <div class="faq-panel-inner">
+            <p>No. Judges remain responsible for evaluating performances and assigning scores. Judge D Show gives them the tools to capture, save, and organize those scores, and gives organizers the tools to tabulate results.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-3" aria-expanded="false" aria-controls="faq-a-3">
+            <span>Can Judge D Show be used with our existing judging process?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-3" class="faq-panel" role="region" aria-labelledby="faq-q-3" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Categories, criteria, and scoring rules are configured to match how your competition already judges, not the other way around.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-4" aria-expanded="false" aria-controls="faq-a-4">
+            <span>What happens if there is poor Wi-Fi or cellular service at the event?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-4" class="faq-panel" role="region" aria-labelledby="faq-q-4" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show detects when a device loses connection and lets the judge know right away, so no one is left guessing whether a score went through. If a save fails, it can be retried with one tap once the connection returns.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-5" aria-expanded="false" aria-controls="faq-a-5">
+            <span>Can we trust a digital system with official competition results?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-5" class="faq-panel" role="region" aria-labelledby="faq-q-5" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show is built for competitions where accuracy and a reliable record matter. It applies the scoring rules configured for your event, gives organizers live visibility into judging progress, and keeps a record of submitted scores. Before your event, we walk your team through exactly how the system works, so nothing is a surprise on the night.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-6" aria-expanded="false" aria-controls="faq-a-6">
+            <span>Is my competition&#x27;s data secure?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-6" class="faq-panel" role="region" aria-labelledby="faq-q-6" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show uses PIN-based access for judges and organizers to control who can enter or change scores. Specific technical questions about how your competition&#x27;s data is handled are best discussed directly — happy to walk through it on a call.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-7" aria-expanded="false" aria-controls="faq-a-7">
+            <span>How much does Judge D Show cost?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-7" class="faq-panel" role="region" aria-labelledby="faq-q-7" hidden>
+          <div class="faq-panel-inner">
+            <p>Pricing is built around your specific competition, based on things like judge count, number of categories, and event support needs. Book a conversation to get a quote for your event.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-8" aria-expanded="false" aria-controls="faq-a-8">
+            <span>How long does it take to set up a competition?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-8" class="faq-panel" role="region" aria-labelledby="faq-q-8" hidden>
+          <div class="faq-panel-inner">
+            <p>Setup typically takes 5 to 10 business days depending on the complexity of your competition, the number of categories, and how many judges and contestants are involved.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-9" aria-expanded="false" aria-controls="faq-a-9">
+            <span>Can we see Judge D Show before committing to it?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-9" class="faq-panel" role="region" aria-labelledby="faq-q-9" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. The best way to see it is a short conversation and walkthrough built around your competition. Book a call below.</p>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div id="faqMore" hidden>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-10" aria-expanded="false" aria-controls="faq-a-10">
+            <span>What types of Carnival competitions can Judge D Show support?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-10" class="faq-panel" role="region" aria-labelledby="faq-q-10" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show supports Panorama, King and Queen, Band of the Year, Calypso and Soca Monarch, Chutney, J&#x27;ouvert, Traditional Mas, Stick Fighting, Limbo, Schools Carnival, Kiddies Carnival, and other judged Carnival categories.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-11" aria-expanded="false" aria-controls="faq-a-11">
+            <span>How do judges score?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-11" class="faq-panel" role="region" aria-labelledby="faq-q-11" hidden>
+          <div class="faq-panel-inner">
+            <p>Judges use a phone or tablet to select their assigned category and contestant, then score against the competition&#x27;s own criteria. The interface shows a running total as they go, so they can see exactly what they&#x27;re submitting before they do.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-12" aria-expanded="false" aria-controls="faq-a-12">
+            <span>Can judges use their own phones?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-12" class="faq-panel" role="region" aria-labelledby="faq-q-12" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Judge D Show runs in a mobile browser, no app to install, and works on modern smartphones and tablets.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-13" aria-expanded="false" aria-controls="faq-a-13">
+            <span>Can the scoring system be customized for our competition?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-13" class="faq-panel" role="region" aria-labelledby="faq-q-13" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Each category&#x27;s criteria and point values are configured specifically for your competition during setup.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-14" aria-expanded="false" aria-controls="faq-a-14">
+            <span>Can Judge D Show handle different judging systems?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-14" class="faq-panel" role="region" aria-labelledby="faq-q-14" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes, within the structure of criteria and point-based scoring. During setup, your competition&#x27;s categories and criteria are built into the system to match how you already judge.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-15" aria-expanded="false" aria-controls="faq-a-15">
+            <span>Can organizers see scores as judges submit them?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-15" class="faq-panel" role="region" aria-labelledby="faq-q-15" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Organizers can watch a live tally update as each judge submits, including how many of their assigned judges have submitted for a given contestant.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-16" aria-expanded="false" aria-controls="faq-a-16">
+            <span>Can organizers see which judges have completed their scores?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-16" class="faq-panel" role="region" aria-labelledby="faq-q-16" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. The organizer view shows submission progress per contestant, so it&#x27;s clear who&#x27;s still outstanding before results are finalized.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-17" aria-expanded="false" aria-controls="faq-a-17">
+            <span>What happens when all the judges have finished?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-17" class="faq-panel" role="region" aria-labelledby="faq-q-17" hidden>
+          <div class="faq-panel-inner">
+            <p>The organizer reviews the tally and prints the official sign-off sheet for the category. This is a deliberate step the organizer takes, not something the system finalizes automatically.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-18" aria-expanded="false" aria-controls="faq-a-18">
+            <span>Can we print or retain an official record of the scores?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-18" class="faq-panel" role="region" aria-labelledby="faq-q-18" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Judge D Show prints blank scoring sheets before the event, each judge&#x27;s own submitted scores, and an official sign-off sheet with signature lines once a category is complete.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-19" aria-expanded="false" aria-controls="faq-a-19">
+            <span>How does Judge D Show reduce scoring and tabulation errors?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-19" class="faq-panel" role="region" aria-labelledby="faq-q-19" hidden>
+          <div class="faq-panel-inner">
+            <p>Scores are captured digitally instead of being transferred by hand from paper sheets, and totals are calculated automatically using the criteria configured for each category. This reduces the chances of transcription and arithmetic errors that come with manual tallying.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-20" aria-expanded="false" aria-controls="faq-a-20">
+            <span>What happens if a judge enters the wrong score?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-20" class="faq-panel" role="region" aria-labelledby="faq-q-20" hidden>
+          <div class="faq-panel-inner">
+            <p>Before submitting, a judge can adjust any score on the card, and the running total updates live as they do. After a score is submitted, it can still be corrected, but only by the organizer, and every correction is logged.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-21" aria-expanded="false" aria-controls="faq-a-21">
+            <span>What happens if a judge loses connectivity while judging?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-21" class="faq-panel" role="region" aria-labelledby="faq-q-21" hidden>
+          <div class="faq-panel-inner">
+            <p>If a judge&#x27;s connection drops mid-score, Judge D Show lets them know right away rather than leaving them guessing. Nothing is lost — if a save fails, it can be retried with one tap the moment the connection is back.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-22" aria-expanded="false" aria-controls="faq-a-22">
+            <span>Do we need technical staff at the event?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-22" class="faq-panel" role="region" aria-labelledby="faq-q-22" hidden>
+          <div class="faq-panel-inner">
+            <p>No. Judges and organizers use the system directly with no technical background required, and event-day support is provided in person.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-23" aria-expanded="false" aria-controls="faq-a-23">
+            <span>Do you provide support during the competition?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-23" class="faq-panel" role="region" aria-labelledby="faq-q-23" hidden>
+          <div class="faq-panel-inner">
+            <p>Yes. Kirt is present in person on event day, not just reachable by phone, to help keep the judging and tabulation process running smoothly.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-24" aria-expanded="false" aria-controls="faq-a-24">
+            <span>What does implementation look like for a Carnival association?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-24" class="faq-panel" role="region" aria-labelledby="faq-q-24" hidden>
+          <div class="faq-panel-inner">
+            <p>We review your competition&#x27;s categories, judging criteria, scoring rules, judges, and event-day needs, configure the platform around that, and walk your team through both the judge and organizer experience before your event.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-25" aria-expanded="false" aria-controls="faq-a-25">
+            <span>Is Judge D Show only for Trinidad Carnival?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-25" class="faq-panel" role="region" aria-labelledby="faq-q-25" hidden>
+          <div class="faq-panel-inner">
+            <p>Judge D Show is built around the specific realities of Carnival competition. Its initial focus is Carnival organizations and competitions in Trinidad and Tobago and the Caribbean diaspora, including the United States.</p>
+          </div>
+        </div>
+      </div>
+      <div class="faq-item">
+        <h3 style="margin:0;">
+          <button type="button" class="faq-trigger" id="faq-q-26" aria-expanded="false" aria-controls="faq-a-26">
+            <span>Why should we move away from paper judging?</span>
+            <span class="faq-icon" aria-hidden="true"><span class="faq-icon-h"></span><span class="faq-icon-v"></span></span>
+          </button>
+        </h3>
+        <div id="faq-a-26" class="faq-panel" role="region" aria-labelledby="faq-q-26" hidden>
+          <div class="faq-panel-inner">
+            <p>Paper judging works, but the work doesn&#x27;t end when the judge makes a decision. Sheets still have to be collected, checked, transferred, totaled, and reconciled by hand. Judge D Show moves that part of the process digital, while judges stay in full control of the actual scoring.</p>
+          </div>
+        </div>
+      </div>
+      </div>
+      <button type="button" id="faqShowAllBtn" aria-expanded="false" aria-controls="faqMore">Show all questions</button>
+    </div>
+  </div>
+
   <!-- PRICING -->
   <div id="pricing" class="jds-pad-lg" style="width: 100%; padding: 88px 40px;">
     <div style="max-width: 700px; margin: 0 auto; text-align: center;">
@@ -272,5 +660,53 @@
   </div>
 
 </div>
+
+<script>
+(function(){
+  function closePanel(item){
+    var trigger = item.querySelector('.faq-trigger');
+    var panel = item.querySelector('.faq-panel');
+    if(trigger.getAttribute('aria-expanded') !== 'true') return;
+    trigger.setAttribute('aria-expanded', 'false');
+    panel.classList.remove('faq-panel-open');
+    var onEnd = function(){ panel.hidden = true; panel.removeEventListener('transitionend', onEnd); };
+    panel.addEventListener('transitionend', onEnd);
+    setTimeout(function(){ if(!panel.classList.contains('faq-panel-open')) panel.hidden = true; }, 250);
+  }
+  function openPanel(item){
+    var trigger = item.querySelector('.faq-trigger');
+    var panel = item.querySelector('.faq-panel');
+    panel.hidden = false;
+    requestAnimationFrame(function(){ panel.classList.add('faq-panel-open'); });
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+  document.querySelectorAll('.faq-item').forEach(function(item){
+    var trigger = item.querySelector('.faq-trigger');
+    trigger.addEventListener('click', function(){
+      var isOpen = trigger.getAttribute('aria-expanded') === 'true';
+      document.querySelectorAll('.faq-item').forEach(function(other){
+        if(other !== item) closePanel(other);
+      });
+      if(isOpen) closePanel(item); else openPanel(item);
+    });
+  });
+  var showAllBtn = document.getElementById('faqShowAllBtn');
+  var faqMore = document.getElementById('faqMore');
+  if(showAllBtn && faqMore){
+    showAllBtn.addEventListener('click', function(){
+      var expanded = showAllBtn.getAttribute('aria-expanded') === 'true';
+      if(expanded){
+        faqMore.hidden = true;
+        showAllBtn.setAttribute('aria-expanded', 'false');
+        showAllBtn.textContent = 'Show all questions';
+      } else {
+        faqMore.hidden = false;
+        showAllBtn.setAttribute('aria-expanded', 'true');
+        showAllBtn.textContent = 'Show fewer questions';
+      }
+    });
+  }
+})();
+</script>
 </body>
 </html>
