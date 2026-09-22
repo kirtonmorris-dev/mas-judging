@@ -2,8 +2,9 @@
 
 This file exists so any future Claude Code session (or human) picking up this
 project has the background needed to work on it safely. Read this before
-making changes. It reflects the state as of 2026-09-22 — if things look
-different, trust the code over this file and update this file.
+making changes. It reflects the state as of 2026-09-22 (updated same-day for
+the client-data-isolation work — see "Client-level data isolation" below) —
+if things look different, trust the code over this file and update this file.
 
 ## What this is
 
@@ -99,8 +100,16 @@ judging app isn't the first thing a prospect hits:
   `type="module"`. Source is organized under `app/src/`: `api.js` (all
   Supabase I/O), `state.js` (single mutable state object), `views/`
   (judge.js, organizer.js, setup.js, tally.js, judgeDetail.js,
-  shared.js), `utils.js`, `constants.js`, `competitionLibrary.js`,
+  shared.js, **admin.js** — see "Client-level data isolation" below),
+  `utils.js`, `constants.js`, `competitionLibrary.js`,
   `historicalLoaders.js`, `importParsers.js`, `print.js`, `ui.js`.
+- **Every judge/organizer page load is bound to exactly one event**, read
+  from a `?event=<id>` URL query param (`main.js`) — there is no in-app
+  event picker/dropdown anymore. `?mode=organizer` starts on the Organizer
+  tab (still PIN-gated); default is the Judge tab. A separate `?admin=1`
+  entry point (its own PIN, its own render path in `admin.js`) is the only
+  place that lists events/clients across the whole database or creates a
+  new event. See "Client-level data isolation" for why.
 - **External library**: SheetJS (xlsx), loaded from cdnjs.cloudflare.com,
   for reading uploaded Excel files.
 - **Fonts**: Google Fonts (Bebas Neue + Inter).
@@ -157,8 +166,8 @@ read/write on everything, same as before).
 
 **The schema was fully normalized in this project's lifetime** (migrating
 off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
-`events`, `judges`, `categories`, `contestants`, `scores`, `score_history`,
-`config_meta`. Key points:
+`clients`, `events`, `judges`, `categories`, `contestants`, `scores`,
+`score_history`, `config_meta`. Key points:
 
 - **`scores`** has a composite primary key
   `(event_id, category_id, contestant_id, judge_slot)`. Every judge
@@ -169,15 +178,19 @@ off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
   judge's newer submission under concurrent load. The new model makes that
   structurally impossible — verified by direct concurrency testing (see
   `scripts/stress-test.mjs`) and confirmed working live by the user.
-- **Config (events/judges/categories/contestants) writes** go through a
-  `replace_config(p_events, p_expected_rev)` Postgres RPC function that
-  atomically replaces the whole event tree in one transaction, preserving
-  the old "organizer edits the whole in-memory tree, then saves it all at
-  once" pattern the UI relies on, but with a real optimistic-concurrency
-  check (`config_meta.rev`) enforced server-side instead of racily in JS.
-  Reads go through a matching `get_config()` RPC that reconstructs the
-  exact nested JSON shape the JS layer expects (camelCase keys etc.) in one
-  round trip.
+- **Config (events/judges/categories/contestants) writes go through
+  `replace_event_config(p_event_id, p_event, p_expected_rev)`** — an
+  event-scoped RPC that atomically replaces *one* event's judges/
+  categories/contestants (never any other event's rows), with an
+  optimistic-concurrency check against that event's own `events.rev`
+  column. Reads go through the matching event-scoped `get_event_config
+  (p_event_id)`. **These replaced the original whole-database
+  `get_config()`/`replace_config(p_events, p_expected_rev)` RPCs**, which
+  returned/replaced *every* event, judge (including plaintext PINs),
+  category, and contestant in the database on every call, regardless of
+  which event the caller actually needed — see "Client-level data
+  isolation" below for the full story. The old RPCs are dropped once this
+  is confirmed stable in production (tracked there).
 - **`score_history`** is now an append-only per-change audit log (one row
   per changed score), not the old capped 10-snapshot blob backup.
 - **The old `mas_judging_data` table still exists, untouched**, as a
@@ -199,7 +212,106 @@ off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
      *actual* API path (or ask the human to click it), not just SQL.
 - **Anon key security model unchanged from the old blob table**: full
   public read/write, no DB-level auth. PIN gates are app-only. This is a
-  known, accepted tradeoff, not an oversight — revisit only if explicitly asked.
+  known, accepted tradeoff, not an oversight. What changed 2026-09-22 is
+  that direct table access for `events`/`judges`/`categories`/`contestants`
+  is being locked down to force everything through the event-scoped RPCs
+  (which run `security definer` and take an explicit `p_event_id`) — see
+  "Client-level data isolation" for the exact plan and status.
+
+## Client-level data isolation (added 2026-09-22)
+
+**The problem this fixed**: every judge- and organizer-facing page loaded
+the *entire* database on every page load — every event, every judge's
+plaintext PIN, every category, every contestant, across every client —
+regardless of which event the visitor actually had a link/PIN for. The
+event picker dropdown (removed) showed every client's events side by side
+in both the Judge and Organizer tabs. This was found during a client-data-
+isolation audit and fixed the same day; see the audit conversation for the
+full before/after.
+
+**What changed**:
+
+- **New `clients` table** (`id uuid`, `name`, `contact_name`,
+  `contact_email`, `contact_phone`, `created_at`) and `events.client_id`
+  (FK, `not null`). Backfilled: `West Indian American Day Carnival
+  Association — Junior Carnival` and `WIADCA - Monday Mas` →
+  "WIADCA (West Indian American Day Carnival Association)"; `Testing -
+  Panorama` → "Internal Test / Sandbox". Baltimore has no event row in this
+  database at all (see the data-discrepancy note above) so no client was
+  created for it — do that when its real event data actually shows up here.
+- **Every judge/organizer session is now bound to exactly one event** via
+  a `?event=<id>` URL param (`main.js` reads it into `state.eventId` before
+  anything loads; missing/invalid param → an explicit error screen, no
+  fallback to "the first event" or any other event). There is no dropdown
+  to switch events from the Judge or Organizer tab anymore.
+- **New event-scoped RPCs**, all `security definer`, all taking an explicit
+  `p_event_id` and touching only that event's rows: `get_event_config`,
+  `replace_event_config`, `delete_event_own`. `fetchScores()` in `api.js`
+  now always filters `?event_id=eq.<id>` (previously unfiltered — every
+  judge/organizer page pulled every score row in the database).
+- **New admin view** (`app/src/views/admin.js`, reached only via
+  `/app?admin=1`, gated by its own `ADMIN_PIN` in `constants.js` — separate
+  from the judge/organizer `ORG_PIN`). This is the *only* code path that
+  can see more than one event/client at once, via its own RPCs
+  (`list_events_admin`, `list_clients_admin` — id/name only, no judges, no
+  PINs, no contestants) or create a new client/event
+  (`create_client_admin`, `create_event_admin`). It shares no query with
+  the judge/organizer views — there is no flag anywhere that widens a
+  normal session into this one. Each event row in the admin list has
+  "Judge link"/"Organizer link" buttons that copy the link to the clipboard
+  **and** open it in a new tab (`window.open(link, '_blank', 'noopener')` —
+  added after the user asked for the new-tab behavior; copy-only was the
+  original design).
+- **New ids use `crypto.randomUUID()`** (`uid()` in `utils.js`), not
+  `Math.random().toString(36)`. Existing WIADCA/Testing event/category/
+  contestant ids were left as their original short strings — only newly
+  created rows get real UUIDs. This matters now that `scores`/
+  `score_history` stay directly queryable by id (see below) — an unguessable
+  id is doing real work, not just cosmetic.
+- **Old `get_config()`/`replace_config()` RPCs**: left in place, unused by
+  the new code, until the new code has been live on `main` for a while and
+  is confirmed stable — dropping them immediately would have broken
+  production for real WIADCA users still on the old deployed code during
+  testing. **Drop these once you're confident nothing depends on them
+  anymore** — leaving them live is a real hole (anyone with the public
+  anon key, which is not a secret, can still `curl` them directly and get
+  the whole database, bypassing the app UI entirely). Track this as
+  unfinished until it's done.
+
+**What's honestly still a limitation, not a gap to code around**: there is
+no real login system, and the anon key is public by design. RLS cannot
+tell *which* judge or organizer is asking, so it cannot enforce "this
+browser may only ever see event X" the way real per-user auth would. What
+exists instead: no code path fetches more than one event's data, and
+(once the RLS lockdown below is applied) no one can bypass the app to hit
+`events`/`judges`/`categories`/`contestants` directly either — only the
+scoped RPCs can read/write them. `scores`/`score_history` stay directly
+queryable by anyone who has a specific event's id (needed for the
+concurrency-safe upsert pattern), same risk model as before, just now
+correctly scoped to one event instead of returning everything.
+
+**Also a known, not-yet-fixed gap**: the Organizer PIN (`ORG_PIN`, `2026`)
+is one shared value across *every* event/client, not per-event. Anyone who
+knows it can open the Organizer tab for any event's link, including a
+brand-new client's. The underlying *data* is correctly isolated (that
+organizer still can't reach another client's data even with the shared
+PIN), but the PIN gate itself doesn't distinguish clients. Fixing this
+properly means a per-event organizer PIN generated at event-creation time
+in `admin.js` and stored on the `events` row — not yet built, flagged to
+the user, no decision made yet on whether it's worth doing given Kirt is
+currently the only person setting up events and handing out links/PINs.
+
+**RLS lockdown — planned, not yet applied as of this note**: once the new
+code has been live on `main` long enough to trust nothing still calls the
+old whole-database RPCs, apply a migration that (1) drops `get_config()`
+and `replace_config()` entirely, and (2) revokes anon `SELECT`/write on
+`events`/`judges`/`categories`/`contestants` directly, since everything
+needed from those tables now goes through the `security definer`
+event-scoped RPCs. `scores`/`score_history` keep their existing open
+policies (anon `SELECT`/`INSERT`/`UPDATE`/`DELETE`, no `USING`/`WITH CHECK`
+restriction) since the app's concurrency-safe upsert pattern needs direct
+table access — isolation there comes from the app always filtering by
+`event_id`, not from RLS. Show the exact SQL to the user before running it.
 
 ## Data model (conceptual shape, now split across normalized tables)
 
@@ -431,17 +543,27 @@ not a hardcoded ID.
 
 ## Organizer access
 
-Organizer PIN: `2026` (`ORG_PIN` in `src/constants.js`, not in Supabase).
+Organizer PIN: `2026` (`ORG_PIN` in `src/constants.js`, not in Supabase) —
+one shared value across every event/client, see the isolation section's
+"known, not-yet-fixed gap" above.
+
+Admin PIN: `738104` (`ADMIN_PIN` in `src/constants.js`) — gates `/app?admin=1`
+only, unrelated to `ORG_PIN`. Change it before sharing an admin link
+publicly; it was set as a placeholder, not chosen for strength.
 
 ## Things intentionally NOT built (don't assume otherwise)
 
-- No account system beyond judge PIN + organizer PIN.
+- No account system beyond judge PIN + organizer PIN + admin PIN.
 - No real-time push (no websockets) — polling only (15s interval in
   `src/main.js`, paused while a judge is on an active scoring card).
 - No lock/freeze mechanism for categories after sign-off printing
   (deliberate, confirmed with Kirt).
-- No DB-level authorization beyond RLS policies that mirror "anyone with
-  the anon key can do anything" — security is app-level PIN gates only.
+- No DB-level authorization beyond RLS policies scoped by the event-scoped
+  RPCs — see "Client-level data isolation" above for exactly what is and
+  isn't enforced at the DB layer now, and what's still pending (the RLS
+  lockdown migration, dropping the old whole-database RPCs).
+- No per-event organizer PIN — one shared `ORG_PIN` for every event/client
+  (see "Client-level data isolation" above).
 
 ## Copyright / ownership note
 
