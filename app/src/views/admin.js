@@ -101,6 +101,7 @@ export function attachAdminHandlers(){
   document.querySelectorAll('[data-copy-link]').forEach(btn=>{
     btn.onclick = async ()=>{
       const link = btn.getAttribute('data-copy-link');
+      window.open(link, '_blank', 'noopener');
       try{ await navigator.clipboard.writeText(link); btn.textContent = 'Copied!'; setTimeout(()=>{ btn.textContent = btn.textContent==='Copied!' ? (link.includes('mode=organizer')?'Organizer link':'Judge link') : btn.textContent; }, 1500); }
       catch(e){ prompt('Copy this link:', link); }
     };
