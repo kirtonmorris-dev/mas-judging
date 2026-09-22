@@ -1,4 +1,4 @@
-import { saveConfig, saveScoreEntry } from '../api.js';
+import { saveConfig, saveScoreEntry, saveScoresMerge } from '../api.js';
 import { render } from '../main.js';
 import { printMyScores } from '../print.js';
 import { state } from '../state.js';
@@ -244,12 +244,21 @@ export function attachJudgeHandlers(){
     const cat = ev.categories.find(c=>c.id===state.categoryId);
     const contestant = cat.contestants.find(c=>c.id===state.contestantId);
     const key = scoreKey(ev.id, cat.id, contestant.id, state.judge);
+    // Captured before the save overwrites it, so a same-tap Undo can put it back.
+    const previousEntry = state.scores[key] ? {...state.scores[key]} : null;
     const entry = {...state.draft[key], judge: state.judge, event: ev.id, category: cat.id, contestant: contestant.id, submittedAt: Date.now()};
     submitBtn.disabled = true;
     submitBtn.textContent = 'Saving\u2026';
     const ok = await saveScoreEntry(key, entry);
     if(ok){
-      showToast('Score saved for ' + contestantTitle(cat, contestant));
+      const label = contestantTitle(cat, contestant);
+      showToast('Score saved for ' + label, false, async ()=>{
+        const undone = await saveScoresMerge(latest=>{
+          if(previousEntry) latest[key] = previousEntry;
+          else delete latest[key];
+        });
+        if(undone){ showToast('Submission undone'); render(); }
+      }, 'Undo');
       state.contestantId = null;
       render();
     } else {

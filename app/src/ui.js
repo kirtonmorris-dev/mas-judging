@@ -1,26 +1,27 @@
-// retryFn, when given, adds a tappable "Retry" button to the toast so a
-// failed save can be re-attempted right there instead of hunting for the
-// original button. Error toasts also stay up longer than success ones --
-// 1.8s is fine for a confirmation, not enough time to read a failure
-// outdoors and decide what to do about it.
-export function showToast(msg, isErr, retryFn){
+// actionFn, when given, adds a tappable button (label defaults to "Retry",
+// e.g. for a failed save that can be re-attempted right there) to the toast.
+// Passing actionLabel="Undo" reuses the same mechanism for a brief
+// post-submit undo window. Error toasts also stay up longer than success
+// ones -- 1.8s is fine for a confirmation, not enough time to read a
+// failure outdoors and decide what to do about it.
+export function showToast(msg, isErr, actionFn, actionLabel){
   const t = document.getElementById('toast');
   t.innerHTML = '';
   const span = document.createElement('span');
   span.textContent = msg;
   t.appendChild(span);
-  if(retryFn){
+  if(actionFn){
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'toast-retry';
-    btn.textContent = 'Retry';
-    btn.onclick = ()=>{ t.classList.remove('show'); retryFn(); };
+    btn.textContent = actionLabel || 'Retry';
+    btn.onclick = ()=>{ t.classList.remove('show'); actionFn(); };
     t.appendChild(btn);
   }
   t.style.background = isErr ? 'var(--danger)' : 'var(--green)';
   t.classList.add('show');
   clearTimeout(t._hideTimer);
-  const duration = retryFn ? 6000 : (isErr ? 3200 : 1800);
+  const duration = actionFn ? 6000 : (isErr ? 3200 : 1800);
   t._hideTimer = setTimeout(()=>t.classList.remove('show'), duration);
 }
 
