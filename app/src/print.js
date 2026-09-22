@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { showToast } from './ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, scoreKey } from './utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, scoreKey, setLastPrintedAt } from './utils.js';
 
 export function buildBlankSheetPageHtml(ev, cat, judgeName){
   const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
@@ -119,10 +119,12 @@ export function buildSignoffPageHtml(ev, cat){
 export function printSignoffSheet(ev, cat){
   document.getElementById('printArea').innerHTML = buildSignoffPageHtml(ev, cat);
   window.print();
+  setLastPrintedAt(ev.id, cat.id);
 }
 
 export function printAllSignoffSheets(ev){
   if(ev.categories.length===0){ showToast('No categories to print', true); return; }
   document.getElementById('printArea').innerHTML = ev.categories.map(c=>buildSignoffPageHtml(ev,c)).join('');
   window.print();
+  ev.categories.forEach(c=>setLastPrintedAt(ev.id, c.id));
 }
