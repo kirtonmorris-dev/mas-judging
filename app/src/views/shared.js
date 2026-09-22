@@ -1,37 +1,19 @@
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 
+// Every session (judge or organizer) is bound to exactly one event via the
+// ?event= URL param -- there is no dropdown here anymore, so there is no
+// way for a judge or organizer link to browse into a different event.
+// Creating new events, and seeing more than one event at a time, only
+// happens in views/admin.js (reached via /app?admin=1).
 export function renderEventPicker(isOrganizer){
   const cfg = state.config;
-  if(!isOrganizer && cfg.events.length===0) return '';
+  const ev = cfg && cfg.events[0];
+  if(!ev) return '';
 
-  let html = '<div class="card"><label>Event</label>';
-  if(cfg.events.length===0){
-    html += `<input type="text" id="newEventNameInline" placeholder="New event name (e.g. NY Carnival — J'ouvert)">
-      <button class="btn btn-primary btn-small" id="createEventInlineBtn">Create event</button>`;
-    if(!cfg.events.find(e=>e.name==='Baltimore One Carnival 2026 (Historical)')){
-      html += '<button class="btn btn-outline btn-small" id="loadBaltimoreHistBtn" style="margin-top:10px; width:100%;">Load Baltimore 2026 historical data from spreadsheet</button>';
-    }
-    html += '</div>';
-    return html;
-  }
-
-  html += '<select id="eventSelect">';
-  cfg.events.forEach(ev=>{
-    html += `<option value="${ev.id}" ${state.eventId===ev.id?'selected':''}>${escapeHtml(ev.name)}</option>`;
-  });
-  if(isOrganizer) html += `<option value="__add__">+ Add new event&hellip;</option>`;
-  html += '</select>';
+  let html = `<div class="card"><label>Event</label><div style="font-weight:600; font-size:1.05rem;">${escapeHtml(ev.name)}</div>`;
 
   if(isOrganizer){
-    html += `<input type="text" id="newEventNameInline" placeholder="New event name (e.g. NY Carnival — J'ouvert)" style="display:none; margin-top:0;">
-      <button class="btn btn-primary btn-small" id="createEventInlineBtn" style="display:none; margin-top:8px;">Create event</button>`;
-    if(!cfg.events.find(e=>e.name==='Baltimore One Carnival 2026 (Historical)')){
-      html += '<button class="btn btn-outline btn-small" id="loadBaltimoreHistBtn" style="margin-top:10px; width:100%;">Load Baltimore 2026 historical data from spreadsheet</button>';
-    } else {
-      html += '<button class="btn btn-outline btn-small" id="fixBaltimoreBtn" style="margin-top:10px; width:100%;">Apply Baltimore score corrections (Adult Female Individual + Non-Costume Band Large)</button>';
-    }
-    html += '<button class="btn btn-outline btn-small" id="loadWiadcaBtn" style="margin-top:10px; width:100%;">Load WIADCA Junior Carnival data into this event</button>';
     html += `<div class="danger-zone">
         <div class="danger-zone-label">Danger zone</div>
         <button class="btn-danger-quiet" id="removeCurrentEventBtn">Remove this event</button>

@@ -20,4 +20,7 @@ export let state = {
   organizerEditSummary: {},
   scoreHistoryCache: {},
   historyPanelCategoryId: null,
+  adminUnlocked: false,
+  adminClients: null,
+  adminEvents: null,
 };
