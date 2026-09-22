@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { contestantSubtitle, contestantTitle, escapeHtml, scoreKey, shortJudgeLabel } from '../utils.js';
+import { contestantSubtitle, contestantTitle, escapeHtml, getLastPrintedAt, scoreKey, shortJudgeLabel } from '../utils.js';
 
 export function renderTally(ev){
   if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one below.</div>';
@@ -23,10 +23,20 @@ export function renderTally(ev){
       </select></div>`;
   }
 
-  html += `<div class="row" style="margin-bottom:12px;">
+  const lastPrinted = getLastPrintedAt(ev.id, catId);
+  const lastOrgEdit = (state.organizerEditSummary[ev.id] || {})[catId];
+  const editedSincePrint = !!(lastPrinted && lastOrgEdit && new Date(lastOrgEdit).getTime() > lastPrinted);
+
+  html += `<div class="row" style="margin-bottom:12px; align-items:center; flex-wrap:wrap; gap:8px;">
       <button class="btn btn-outline-light btn-small" id="printSignoffBtn">Print for signatures</button>
       <button class="btn btn-outline-light btn-small" id="printAllSignoffBtn">Print all categories</button>
+      <button class="btn btn-outline-light btn-small" data-view-history="${escapeHtml(catId)}">View edit history</button>
+      ${editedSincePrint ? '<span style="color:#b8860b; font-weight:700; font-size:0.82rem;">&#9888; Edited by organizer since sign-off was last printed</span>' : ''}
     </div>`;
+
+  if(state.historyPanelCategoryId === catId){
+    html += renderHistoryPanel(ev.id, cat);
+  }
 
   const visibleContestants = (stages.length && state.tallyStageFilter)
     ? cat.contestants.filter(ct=>ct.stage===state.tallyStageFilter)
@@ -72,5 +82,29 @@ export function renderTally(ev){
     html += `<td class="num">${r.total===null?'&mdash;':r.total}</td></tr>`;
   });
   html += '</tbody></table></div>';
+  return html;
+}
+
+function renderHistoryPanel(eventId, cat){
+  const cacheKey = eventId + '|' + cat.id;
+  const rows = state.scoreHistoryCache[cacheKey];
+  let html = '<div class="card">';
+  html += '<div style="font-weight:700; margin-bottom:8px;">Edit history — ' + escapeHtml(cat.name) + '</div>';
+  if(!rows){
+    html += '<div class="small-note">Loading…</div>';
+  } else if(rows.length === 0){
+    html += '<div class="small-note">No changes logged for this category yet.</div>';
+  } else {
+    html += '<table><thead><tr><th>When</th><th>Entry</th><th>Judge</th><th>By</th><th>Total</th></tr></thead><tbody>';
+    rows.forEach(r=>{
+      const ct = cat.contestants.find(c=>c.id===r.contestant_id);
+      const entryLabel = ct ? contestantTitle(cat, ct) : '(removed entry)';
+      const total = cat.criteria.reduce((sum,c)=>sum+((r.values||{})[c.key]||0),0);
+      const by = r.changed_by === 'organizer' ? 'Organizer correction' : 'Judge submission';
+      html += `<tr><td>${new Date(r.changed_at).toLocaleString()}</td><td>${escapeHtml(entryLabel)}</td><td>${escapeHtml(shortJudgeLabel(r.judge_slot))}</td><td>${by}</td><td class="num">${total}</td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
   return html;
 }

@@ -59,3 +59,27 @@ export function shortJudgeLabel(name){
 export function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 export function escapeAttr(s){ return escapeHtml(s); }
+
+// Sign-off print timestamps live in localStorage, not the DB -- this is
+// visibility only (was the sheet in this browser reprinted after an edit?),
+// never an enforcement mechanism, so it doesn't need to be authoritative
+// across devices.
+const LAST_PRINTED_KEY = 'jds_last_printed';
+
+function readLastPrintedMap(){
+  try{ return JSON.parse(localStorage.getItem(LAST_PRINTED_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+
+export function getLastPrintedAt(eventId, categoryId){
+  const map = readLastPrintedMap();
+  return map[eventId + '|' + categoryId] || null;
+}
+
+export function setLastPrintedAt(eventId, categoryId){
+  try{
+    const map = readLastPrintedMap();
+    map[eventId + '|' + categoryId] = Date.now();
+    localStorage.setItem(LAST_PRINTED_KEY, JSON.stringify(map));
+  }catch(e){ /* localStorage unavailable -- indicator just won't show, no functional impact */ }
+}

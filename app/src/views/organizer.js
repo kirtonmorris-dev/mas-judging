@@ -1,4 +1,4 @@
-import { saveConfig, saveOrganizerScoreEdit, saveScoresMerge } from '../api.js';
+import { fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit, saveScoresMerge } from '../api.js';
 import { ORG_PIN, cloneTemplate, normalizeConfig } from '../constants.js';
 import { fixBaltimoreCorrections, loadBaltimoreHistorical, loadWIADCAJuniorData } from '../historicalLoaders.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
@@ -113,12 +113,12 @@ export function attachOrganizerHandlers(){
 
   const orgTabs = document.querySelectorAll('[data-org-tab]');
   orgTabs.forEach(el=>{
-    el.onclick = ()=>{ state.orgTab = el.getAttribute('data-org-tab'); state.orgEditKey=null; render(); };
+    el.onclick = ()=>{ state.orgTab = el.getAttribute('data-org-tab'); state.orgEditKey=null; state.historyPanelCategoryId=null; render(); };
   });
 
   if(state.orgTab==='tally'){
     const sel = document.getElementById('tallyCategorySelect');
-    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; state.tallyStageFilter=''; render(); };
+    if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; state.tallyStageFilter=''; state.historyPanelCategoryId=null; render(); };
     const stageSel = document.getElementById('tallyStageSelect');
     if(stageSel) stageSel.onchange = (e)=>{ state.tallyStageFilter = e.target.value; render(); };
     const ev = currentEvent();
@@ -129,9 +129,35 @@ export function attachOrganizerHandlers(){
         const cat = ev.categories.find(c=>c.id===catId);
         if(!cat){ showToast('No category selected', true); return; }
         printSignoffSheet(ev, cat);
+        render();
       };
       const printAllSignoffBtn = document.getElementById('printAllSignoffBtn');
-      if(printAllSignoffBtn) printAllSignoffBtn.onclick = ()=> printAllSignoffSheets(ev);
+      if(printAllSignoffBtn) printAllSignoffBtn.onclick = ()=>{ printAllSignoffSheets(ev); render(); };
+
+      if(!state.organizerEditSummary[ev.id]){
+        fetchOrganizerEditSummary(ev.id).then(summary=>{
+          state.organizerEditSummary[ev.id] = summary;
+          if(state.mode==='organizer' && state.orgTab==='tally' && state.eventId===ev.id) render();
+        }).catch(e=>console.error('organizer edit summary load failed', e));
+      }
+
+      const historyBtn = document.querySelector('[data-view-history]');
+      if(historyBtn) historyBtn.onclick = ()=>{
+        const catId = historyBtn.getAttribute('data-view-history');
+        if(state.historyPanelCategoryId === catId){ state.historyPanelCategoryId = null; render(); return; }
+        state.historyPanelCategoryId = catId;
+        const cacheKey = ev.id + '|' + catId;
+        if(!state.scoreHistoryCache[cacheKey]){
+          fetchScoreHistoryForCategory(ev.id, catId).then(rows=>{
+            state.scoreHistoryCache[cacheKey] = rows;
+            if(state.historyPanelCategoryId===catId) render();
+          }).catch(e=>{
+            console.error('score history load failed', e);
+            showToast('Could not load edit history — check connection', true);
+          });
+        }
+        render();
+      };
     }
     return;
   }

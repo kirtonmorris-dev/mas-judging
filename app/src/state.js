@@ -17,4 +17,7 @@ export let state = {
   orgEditDraft: {},
   expandedCompetitionSettings: false,
   tallyStageFilter: '',
+  organizerEditSummary: {},
+  scoreHistoryCache: {},
+  historyPanelCategoryId: null,
 };

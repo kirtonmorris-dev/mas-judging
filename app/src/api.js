@@ -104,6 +104,34 @@ async function logScoreHistory(rows){
   });
 }
 
+// Lightweight per-category summary of the latest organizer-made correction,
+// used only to decide whether to show an "edited since printed" badge --
+// not the full change detail (see fetchScoreHistoryForCategory for that).
+export async function fetchOrganizerEditSummary(eventId){
+  const params = new URLSearchParams({
+    event_id: `eq.${eventId}`, changed_by: 'eq.organizer',
+    select: 'category_id,changed_at', order: 'changed_at.desc'
+  });
+  const res = await fetch(`${REST}/score_history?${params}`, { headers: AUTH_HEADERS });
+  if(!res.ok) throw new Error('Supabase score_history GET failed: ' + res.status);
+  const rows = await res.json();
+  const latestByCategory = {};
+  rows.forEach(r=>{
+    if(!(r.category_id in latestByCategory)) latestByCategory[r.category_id] = r.changed_at;
+  });
+  return latestByCategory;
+}
+
+export async function fetchScoreHistoryForCategory(eventId, categoryId){
+  const params = new URLSearchParams({
+    event_id: `eq.${eventId}`, category_id: `eq.${categoryId}`,
+    select: 'contestant_id,judge_slot,values,changed_at,changed_by', order: 'changed_at.desc', limit: '200'
+  });
+  const res = await fetch(`${REST}/score_history?${params}`, { headers: AUTH_HEADERS });
+  if(!res.ok) throw new Error('Supabase score_history GET failed: ' + res.status);
+  return await res.json();
+}
+
 export async function loadAll(){
   let cfg, cfgFetchOk = true;
   try{ cfg = await fetchConfig(); }
