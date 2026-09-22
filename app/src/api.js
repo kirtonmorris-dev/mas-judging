@@ -334,6 +334,16 @@ export async function adminListClients(){
   return await res.json();
 }
 
+export async function adminCreateClient(name){
+  const res = await fetch(`${REST}/rpc/create_client_admin`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_name: name })
+  });
+  if(!res.ok) throw new Error('Supabase create_client_admin failed: ' + res.status);
+  return await res.json();
+}
+
 export async function adminCreateEvent(clientId, name){
   const res = await fetch(`${REST}/rpc/create_event_admin`, {
     method: 'POST',

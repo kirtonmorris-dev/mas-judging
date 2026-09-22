@@ -6,7 +6,7 @@
 // adminCreateEvent, all separate RPCs from the event-scoped ones those
 // views use) -- so there is no flag anywhere that widens a normal
 // session's access into this one.
-import { adminCreateEvent, adminListClients, adminListEvents } from '../api.js';
+import { adminCreateClient, adminCreateEvent, adminListClients, adminListEvents } from '../api.js';
 import { ADMIN_PIN } from '../constants.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
@@ -71,7 +71,10 @@ export function renderAdmin(){
     <select id="adminNewEventClient">
       <option value="">Select client&hellip;</option>
       ${state.adminClients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+      <option value="__new__">+ Add new client&hellip;</option>
     </select>
+    <input type="text" id="adminNewClientName" placeholder="New client name" style="display:none; margin-top:8px;">
+    <button class="btn btn-outline btn-small" id="adminCreateClientBtn" style="display:none; margin-top:8px;">Add client</button>
     <label style="margin-top:10px;">Event name</label>
     <input type="text" id="adminNewEventName" placeholder="e.g. WIADCA — J'ouvert 2027">
     <button class="btn btn-primary btn-small" id="adminCreateEventBtn" style="margin-top:10px;">Create event</button>
@@ -103,13 +106,56 @@ export function attachAdminHandlers(){
     };
   });
 
+  const clientSel = document.getElementById('adminNewEventClient');
+  if(clientSel) clientSel.onchange = ()=>{
+    const isNew = clientSel.value === '__new__';
+    document.getElementById('adminNewClientName').style.display = isNew ? 'block' : 'none';
+    document.getElementById('adminCreateClientBtn').style.display = isNew ? 'block' : 'none';
+    if(isNew) document.getElementById('adminNewClientName').focus();
+  };
+
+  const createClientBtn = document.getElementById('adminCreateClientBtn');
+  if(createClientBtn) createClientBtn.onclick = async ()=>{
+    const nameInput = document.getElementById('adminNewClientName');
+    const name = nameInput.value.trim();
+    const errEl = document.getElementById('adminCreateErr');
+    errEl.style.display = 'none';
+    if(!name){
+      errEl.textContent = 'Enter a client name.';
+      errEl.style.display = 'block';
+      return;
+    }
+    createClientBtn.disabled = true;
+    createClientBtn.textContent = 'Adding…';
+    try{
+      const newClientId = await adminCreateClient(name);
+      const clients = await adminListClients();
+      state.adminClients = clients;
+      const sel = document.getElementById('adminNewEventClient');
+      sel.innerHTML = '<option value="">Select client&hellip;</option>'
+        + clients.map(c=>`<option value="${c.id}" ${c.id===newClientId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')
+        + '<option value="__new__">+ Add new client&hellip;</option>';
+      nameInput.value = '';
+      nameInput.style.display = 'none';
+      createClientBtn.style.display = 'none';
+      createClientBtn.disabled = false;
+      createClientBtn.textContent = 'Add client';
+    }catch(e){
+      console.error('create client failed', e);
+      errEl.textContent = 'Could not add client — check connection.';
+      errEl.style.display = 'block';
+      createClientBtn.disabled = false;
+      createClientBtn.textContent = 'Add client';
+    }
+  };
+
   const createBtn = document.getElementById('adminCreateEventBtn');
   if(createBtn) createBtn.onclick = async ()=>{
     const clientId = document.getElementById('adminNewEventClient').value;
     const name = document.getElementById('adminNewEventName').value.trim();
     const errEl = document.getElementById('adminCreateErr');
     errEl.style.display = 'none';
-    if(!clientId || !name){
+    if(!clientId || clientId === '__new__' || !name){
       errEl.textContent = 'Choose a client and enter an event name.';
       errEl.style.display = 'block';
       return;
