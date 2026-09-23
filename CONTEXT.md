@@ -189,8 +189,8 @@ off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
   returned/replaced *every* event, judge (including plaintext PINs),
   category, and contestant in the database on every call, regardless of
   which event the caller actually needed — see "Client-level data
-  isolation" below for the full story. The old RPCs are dropped once this
-  is confirmed stable in production (tracked there).
+  isolation" below for the full story. **The old RPCs were dropped
+  2026-09-23** (see "Client-level data isolation" below for the migration).
 - **`score_history`** is now an append-only per-change audit log (one row
   per changed score), not the old capped 10-snapshot blob backup.
 - **The old `mas_judging_data` table still exists, untouched**, as a
@@ -210,13 +210,15 @@ off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
      failed with a real judge/organizer click. If a DB function does a
      bulk delete, give it a `where true` (or a real condition) and test the
      *actual* API path (or ask the human to click it), not just SQL.
-- **Anon key security model unchanged from the old blob table**: full
-  public read/write, no DB-level auth. PIN gates are app-only. This is a
-  known, accepted tradeoff, not an oversight. What changed 2026-09-22 is
-  that direct table access for `events`/`judges`/`categories`/`contestants`
-  is being locked down to force everything through the event-scoped RPCs
-  (which run `security definer` and take an explicit `p_event_id`) — see
-  "Client-level data isolation" for the exact plan and status.
+- **Anon key security model, updated 2026-09-23**: `scores`/`score_history`
+  still have full public read/write via direct REST (no DB-level auth,
+  PIN gates are app-only — a known, accepted tradeoff, not an oversight).
+  `events`/`judges`/`categories`/`contestants` are now locked down —
+  direct anon `SELECT`/`INSERT`/`UPDATE`/`DELETE` on those four tables is
+  gone; everything goes through the event-scoped RPCs (which run
+  `security definer`, owned by `postgres`, and take an explicit
+  `p_event_id`) — see "Client-level data isolation" for the exact
+  migration that was applied.
 
 ## Client-level data isolation (added 2026-09-22)
 
@@ -268,22 +270,31 @@ full before/after.
   created rows get real UUIDs. This matters now that `scores`/
   `score_history` stay directly queryable by id (see below) — an unguessable
   id is doing real work, not just cosmetic.
-- **Old `get_config()`/`replace_config()` RPCs**: left in place, unused by
-  the new code, until the new code has been live on `main` for a while and
-  is confirmed stable — dropping them immediately would have broken
-  production for real WIADCA users still on the old deployed code during
-  testing. **Drop these once you're confident nothing depends on them
-  anymore** — leaving them live is a real hole (anyone with the public
-  anon key, which is not a secret, can still `curl` them directly and get
-  the whole database, bypassing the app UI entirely). Track this as
-  unfinished until it's done.
+- **Old `get_config()`/`replace_config()` RPCs — dropped 2026-09-23.** They
+  were left in place, unused by the new code, until the new code had been
+  live on `main` long enough to trust nothing still depended on them
+  (dropping them immediately would have broken production for real WIADCA
+  users still on the old deployed code during testing). Confirmed via
+  `grep` across `app/src/` that neither name was referenced anywhere in
+  the app, then dropped both functions outright in the same migration
+  that locked down the four tables below (migration
+  `drop_old_rpcs_and_lock_down_config_tables`, applied directly to the
+  `pjqojhtqxljnukwlzekr` project — this app has no separate
+  branch/env, it's one shared production database). `scripts/
+  stress-test.mjs`'s Scenario 4 (and its `setupTestEvent`/
+  `cleanupTestEvent` helpers) were rewritten in the same commit to go
+  through `create_event_admin`/`replace_event_config`/`get_event_config`/
+  `delete_event_own`/`list_events_admin`/`list_clients_admin` instead of
+  direct table writes or the dropped RPCs — direct anon inserts to
+  `events`/`judges`/`categories`/`contestants` no longer work either (see
+  below), so the script's setup/cleanup had to move to the RPCs too.
 
 **What's honestly still a limitation, not a gap to code around**: there is
 no real login system, and the anon key is public by design. RLS cannot
 tell *which* judge or organizer is asking, so it cannot enforce "this
 browser may only ever see event X" the way real per-user auth would. What
 exists instead: no code path fetches more than one event's data, and
-(once the RLS lockdown below is applied) no one can bypass the app to hit
+(as of the RLS lockdown above) no one can bypass the app to hit
 `events`/`judges`/`categories`/`contestants` directly either — only the
 scoped RPCs can read/write them. `scores`/`score_history` stay directly
 queryable by anyone who has a specific event's id (needed for the
@@ -301,17 +312,45 @@ in `admin.js` and stored on the `events` row — not yet built, flagged to
 the user, no decision made yet on whether it's worth doing given Kirt is
 currently the only person setting up events and handing out links/PINs.
 
-**RLS lockdown — planned, not yet applied as of this note**: once the new
-code has been live on `main` long enough to trust nothing still calls the
-old whole-database RPCs, apply a migration that (1) drops `get_config()`
-and `replace_config()` entirely, and (2) revokes anon `SELECT`/write on
-`events`/`judges`/`categories`/`contestants` directly, since everything
-needed from those tables now goes through the `security definer`
-event-scoped RPCs. `scores`/`score_history` keep their existing open
-policies (anon `SELECT`/`INSERT`/`UPDATE`/`DELETE`, no `USING`/`WITH CHECK`
-restriction) since the app's concurrency-safe upsert pattern needs direct
-table access — isolation there comes from the app always filtering by
-`event_id`, not from RLS. Show the exact SQL to the user before running it.
+**RLS lockdown — applied 2026-09-23.** Migration
+`drop_old_rpcs_and_lock_down_config_tables`, run directly against the
+`pjqojhtqxljnukwlzekr` project (single shared production database, no
+separate branch/env):
+
+1. `drop function if exists public.get_config();` and
+   `drop function if exists public.replace_config(jsonb, integer);`
+2. For each of `events`, `judges`, `categories`, `contestants`: dropped
+   the four wide-open `"public read"`/`"public write"`/`"public update"`/
+   `"public delete"` policies (`USING (true)`/`WITH CHECK (true)`, role
+   `public`) and ran `revoke select, insert, update, delete on table
+   public.<table> from anon;`. RLS stays enabled on all four with zero
+   policies left, which is default-deny for every role except a table
+   owner (or a role with `BYPASSRLS`) — the event-scoped RPCs
+   (`get_event_config`, `replace_event_config`, `delete_event_own`,
+   `list_events_admin`, `list_clients_admin`, `create_event_admin`,
+   `create_client_admin`, `delete_client_admin`, `resolve_event_slug`) are
+   all `security definer` and owned by `postgres`, which also owns these
+   four tables, so they keep working unaffected (table owners bypass RLS).
+   Only `anon` was revoked, not `authenticated` — this app has no real
+   login and never issues requests as `authenticated`, so that grant was
+   left alone rather than touched on a guess.
+3. `scores`/`score_history` were **not touched** — they keep their
+   existing open policies (anon `SELECT`/`INSERT`/`UPDATE`/`DELETE`, no
+   `USING`/`WITH CHECK` restriction) since the app's concurrency-safe
+   upsert pattern needs direct table access — isolation there still comes
+   from the app always filtering by `event_id`, not from RLS. `clients`/
+   `config_meta` were left alone too.
+
+**Verified post-migration**: as `anon` (`set local role anon;`), a direct
+`select * from judges` now fails with `permission denied for table
+judges`; `get_event_config('<real event id>')` still returns only that
+one event's judges/categories/contestants correctly scoped; `get_config`/
+`replace_config` no longer exist in `pg_proc` at all (any REST call to
+`rpc/get_config` now gets PostgREST's function-not-found error). Security
+advisors show only expected findings (the RPCs being anon-callable
+`security definer` functions is intentional — that's the whole PIN-gate
+model — and `rls_enabled_no_policy` on the four locked-down tables is the
+point of this migration, not a gap).
 
 ## Data model (conceptual shape, now split across normalized tables)
 
@@ -560,8 +599,9 @@ publicly; it was set as a placeholder, not chosen for strength.
   (deliberate, confirmed with Kirt).
 - No DB-level authorization beyond RLS policies scoped by the event-scoped
   RPCs — see "Client-level data isolation" above for exactly what is and
-  isn't enforced at the DB layer now, and what's still pending (the RLS
-  lockdown migration, dropping the old whole-database RPCs).
+  isn't enforced at the DB layer now (the RLS lockdown migration is done —
+  `events`/`judges`/`categories`/`contestants` are anon-inaccessible
+  directly, and the old whole-database RPCs are dropped).
 - No per-event organizer PIN — one shared `ORG_PIN` for every event/client
   (see "Client-level data isolation" above).
 
