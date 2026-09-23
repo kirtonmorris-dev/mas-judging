@@ -12,12 +12,16 @@ import { render } from '../main.js';
 import { state } from '../state.js';
 import { escapeAttr, escapeHtml } from '../utils.js';
 
-function linkFor(eventId, mode){
+function linkFor(ev, mode){
   const url = new URL(location.href);
   url.search = '';
-  url.searchParams.set('event', eventId);
+  url.searchParams.set('event', ev.slug || ev.id);
   if(mode === 'organizer') url.searchParams.set('mode', 'organizer');
   return url.toString();
+}
+
+function slugify(name){
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 
 export function renderAdminGate(){
@@ -54,10 +58,10 @@ export function renderAdmin(){
       html += `<div style="margin-top:14px;"><b>${escapeHtml(clientName)}</b></div>`;
       byClient[clientName].forEach(ev=>{
         html += `<div class="contestant-item" style="cursor:default;">
-          <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.active ? 'active' : 'inactive'}</span></div>
+          <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.slug ? escapeHtml(ev.slug) : '(no slug set)'} &middot; ${ev.active ? 'active' : 'inactive'}</span></div>
           <span style="display:flex; gap:6px;">
-            <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev.id,'judge'))}">Judge link</button>
-            <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev.id,'organizer'))}">Organizer link</button>
+            <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'judge'))}">Judge link</button>
+            <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'organizer'))}">Organizer link</button>
           </span>
         </div>`;
       });
@@ -77,6 +81,8 @@ export function renderAdmin(){
     <button class="btn btn-outline btn-small" id="adminCreateClientBtn" style="display:none; margin-top:8px;">Add client</button>
     <label style="margin-top:10px;">Event name</label>
     <input type="text" id="adminNewEventName" placeholder="e.g. WIADCA — J'ouvert 2027">
+    <label style="margin-top:10px;">Link slug (memorable, goes in the URL)</label>
+    <input type="text" id="adminNewEventSlug" placeholder="e.g. wiadca-jouvert-2027">
     <button class="btn btn-primary btn-small" id="adminCreateEventBtn" style="margin-top:10px;">Create event</button>
     <div id="adminCreateErr" class="err" style="display:none; margin-top:10px;"></div>
   </div>`;
@@ -150,10 +156,19 @@ export function attachAdminHandlers(){
     }
   };
 
+  const nameInput = document.getElementById('adminNewEventName');
+  const slugInput = document.getElementById('adminNewEventSlug');
+  let slugTouched = false;
+  if(slugInput) slugInput.oninput = ()=>{ slugTouched = true; };
+  if(nameInput) nameInput.oninput = ()=>{
+    if(!slugTouched) slugInput.value = slugify(nameInput.value);
+  };
+
   const createBtn = document.getElementById('adminCreateEventBtn');
   if(createBtn) createBtn.onclick = async ()=>{
     const clientId = document.getElementById('adminNewEventClient').value;
     const name = document.getElementById('adminNewEventName').value.trim();
+    const slug = document.getElementById('adminNewEventSlug').value.trim();
     const errEl = document.getElementById('adminCreateErr');
     errEl.style.display = 'none';
     if(!clientId || clientId === '__new__' || !name){
@@ -164,11 +179,13 @@ export function attachAdminHandlers(){
     createBtn.disabled = true;
     createBtn.textContent = 'Creating…';
     try{
-      await adminCreateEvent(clientId, name);
+      await adminCreateEvent(clientId, name, slug);
       await loadAdminData();
     }catch(e){
       console.error('create event failed', e);
-      errEl.textContent = 'Could not create event — check connection.';
+      errEl.textContent = e && e.code === 'slug_taken'
+        ? 'That link slug is already used by another event — pick a different one.'
+        : 'Could not create event — check connection.';
       errEl.style.display = 'block';
       createBtn.disabled = false;
       createBtn.textContent = 'Create event';
