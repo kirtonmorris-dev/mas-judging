@@ -6,7 +6,7 @@
 // adminCreateEvent, all separate RPCs from the event-scoped ones those
 // views use) -- so there is no flag anywhere that widens a normal
 // session's access into this one.
-import { adminCreateClient, adminCreateEvent, adminListClients, adminListEvents } from '../api.js';
+import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, deleteEventOwn } from '../api.js';
 import { ADMIN_PIN } from '../constants.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
@@ -47,21 +47,29 @@ export function renderAdmin(){
   }
 
   let html = '<div class="card"><div class="section-title" style="color:var(--ink);">Clients &amp; events</div>';
-  if(!state.adminEvents.length){
-    html += '<div class="empty">No events yet.</div>';
+  if(!state.adminClients.length){
+    html += '<div class="empty">No clients yet.</div>';
   } else {
-    const byClient = {};
+    const eventsByClientId = {};
     state.adminEvents.forEach(ev=>{
-      (byClient[ev.clientName] = byClient[ev.clientName] || []).push(ev);
+      (eventsByClientId[ev.clientId] = eventsByClientId[ev.clientId] || []).push(ev);
     });
-    Object.keys(byClient).sort().forEach(clientName=>{
-      html += `<div style="margin-top:14px;"><b>${escapeHtml(clientName)}</b></div>`;
-      byClient[clientName].forEach(ev=>{
+    [...state.adminClients].sort((a,b)=>a.name.localeCompare(b.name)).forEach(client=>{
+      const events = eventsByClientId[client.id] || [];
+      html += `<div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <b>${escapeHtml(client.name)}</b>
+        <button class="btn-danger-quiet" data-remove-client="${escapeAttr(client.id)}" style="font-size:0.72rem;">Remove client</button>
+      </div>`;
+      if(!events.length){
+        html += '<div class="empty" style="margin-top:4px;">No events yet.</div>';
+      }
+      events.forEach(ev=>{
         html += `<div class="contestant-item" style="cursor:default;">
           <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.slug ? escapeHtml(ev.slug) : '(no slug set)'} &middot; ${ev.active ? 'active' : 'inactive'}</span></div>
           <span style="display:flex; gap:6px;">
             <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'judge'))}">Judge link</button>
             <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'organizer'))}">Organizer link</button>
+            <button class="btn-danger-quiet" data-remove-event="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Remove</button>
           </span>
         </div>`;
       });
@@ -155,6 +163,46 @@ export function attachAdminHandlers(){
       createClientBtn.textContent = 'Add client';
     }
   };
+
+  document.querySelectorAll('[data-remove-event]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const eventId = btn.getAttribute('data-remove-event');
+      const eventName = btn.getAttribute('data-event-name');
+      if(!confirm(`Remove "${eventName}"? This deletes its judges, categories, contestants, and scores. This cannot be undone.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Removing…';
+      try{
+        await deleteEventOwn(eventId);
+        await loadAdminData();
+      }catch(e){
+        console.error('remove event failed', e);
+        alert('Could not remove event — check connection.');
+        btn.disabled = false;
+        btn.textContent = 'Remove';
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-remove-client]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const clientId = btn.getAttribute('data-remove-client');
+      if(!clientId) return;
+      if(!confirm('Remove this client? Only allowed if it has no events left.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Removing…';
+      try{
+        await adminDeleteClient(clientId);
+        await loadAdminData();
+      }catch(e){
+        console.error('remove client failed', e);
+        alert(e && e.code === 'client_has_events'
+          ? 'This client still has events — remove those first.'
+          : 'Could not remove client — check connection.');
+        btn.disabled = false;
+        btn.textContent = 'Remove client';
+      }
+    };
+  });
 
   const nameInput = document.getElementById('adminNewEventName');
   const slugInput = document.getElementById('adminNewEventSlug');
