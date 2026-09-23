@@ -1,6 +1,6 @@
 /* Judge D Show — Live Scoring for Every Competition
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
-import { fetchScores, loadAll } from './api.js';
+import { fetchScores, loadAll, resolveEventSlug } from './api.js';
 import { state } from './state.js';
 import { initConnectionBanner } from './ui.js';
 import { draftHasUnsavedWork } from './utils.js';
@@ -49,6 +49,36 @@ export function render(){
   }
 }
 
+function startEventSession(){
+  // Warn before closing/reloading if any judge has an unsubmitted score draft --
+  // state.draft lives only in memory, so this is the only thing standing between
+  // a stray tab close and losing a half-entered score.
+  window.onbeforeunload = (e)=>{
+    if(!state.config) return;
+    const hasUnsaved = Object.keys(state.draft).some(key=>{
+      const [evId, catId] = key.split('|');
+      const ev = state.config.events.find(e=>e.id===evId);
+      const cat = ev && ev.categories.find(c=>c.id===catId);
+      return cat && draftHasUnsavedWork(key, cat);
+    });
+    if(hasUnsaved){ e.preventDefault(); e.returnValue=''; return ''; }
+  };
+
+  initConnectionBanner();
+  loadAll();
+
+  setInterval(async ()=>{
+    const orgShouldRefresh = state.mode==='organizer' && state.orgUnlocked && (state.orgTab==='tally' || state.orgTab==='detail');
+    const judgeShouldRefresh = state.mode==='judge' && state.judgeUnlocked && !state.contestantId;
+    if(orgShouldRefresh || judgeShouldRefresh){
+      try{
+        const sc = await fetchScores(state.eventId);
+        if(sc){ state.scores = sc; render(); }
+      }catch(e){ console.error('auto-refresh failed', e); }
+    }
+  }, 15000);
+}
+
 if(isAdmin){
   // The admin view is a fully separate entry point: no event binding, no
   // judge/organizer tab bar, no shared render path with the rest of the app.
@@ -57,44 +87,19 @@ if(isAdmin){
   const modebar = document.querySelector('.modebar');
   if(modebar) modebar.style.display = 'none';
   render();
+} else if(!urlEventId){
+  document.getElementById('loadingMsg').textContent = 'This link does not point to a specific event. Ask your organizer for the correct link.';
 } else {
   document.getElementById('tabJudge').onclick = ()=>{ state.mode='judge'; setActiveTab(); render(); };
   document.getElementById('tabOrganizer').onclick = ()=>{ state.mode='organizer'; setActiveTab(); render(); };
+  state.mode = startMode;
+  setActiveTab();
 
-  if(!urlEventId){
-    const loadingMsg = document.getElementById('loadingMsg');
-    loadingMsg.textContent = 'This link does not point to a specific event. Ask your organizer for the correct link.';
-  } else {
-    state.eventId = urlEventId;
-    state.mode = startMode;
-    setActiveTab();
-
-    // Warn before closing/reloading if any judge has an unsubmitted score draft --
-    // state.draft lives only in memory, so this is the only thing standing between
-    // a stray tab close and losing a half-entered score.
-    window.onbeforeunload = (e)=>{
-      if(!state.config) return;
-      const hasUnsaved = Object.keys(state.draft).some(key=>{
-        const [evId, catId] = key.split('|');
-        const ev = state.config.events.find(e=>e.id===evId);
-        const cat = ev && ev.categories.find(c=>c.id===catId);
-        return cat && draftHasUnsavedWork(key, cat);
-      });
-      if(hasUnsaved){ e.preventDefault(); e.returnValue=''; return ''; }
-    };
-
-    initConnectionBanner();
-    loadAll();
-
-    setInterval(async ()=>{
-      const orgShouldRefresh = state.mode==='organizer' && state.orgUnlocked && (state.orgTab==='tally' || state.orgTab==='detail');
-      const judgeShouldRefresh = state.mode==='judge' && state.judgeUnlocked && !state.contestantId;
-      if(orgShouldRefresh || judgeShouldRefresh){
-        try{
-          const sc = await fetchScores(state.eventId);
-          if(sc){ state.scores = sc; render(); }
-        }catch(e){ console.error('auto-refresh failed', e); }
-      }
-    }, 15000);
-  }
+  // ?event= can be a memorable slug ("wiadca-junior") or, for links shared
+  // before slugs existed, the raw internal event id -- try the slug lookup
+  // first and fall back to treating the param as the real id.
+  resolveEventSlug(urlEventId)
+    .then(resolved => { state.eventId = resolved || urlEventId; })
+    .catch(e => { console.error('slug resolution failed', e); state.eventId = urlEventId; })
+    .finally(startEventSession);
 }

@@ -12,6 +12,20 @@ const AUTH_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_K
 // or scores. The only exception is the separate admin.js code path, which
 // exists specifically to see across events and is PIN-gated on its own.
 
+// Public, harmless: turns a memorable slug (e.g. "wiadca-junior") into the
+// real event id used everywhere else. Returns null if the slug is unknown --
+// callers fall back to treating the original ?event= value as a raw id, so
+// links shared before slugs existed keep working.
+export async function resolveEventSlug(slug){
+  const res = await fetch(`${REST}/rpc/resolve_event_slug`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_slug: slug })
+  });
+  if(!res.ok) throw new Error('Supabase resolve_event_slug failed: ' + res.status);
+  return await res.json();
+}
+
 async function fetchEventConfig(eventId){
   const res = await fetch(`${REST}/rpc/get_event_config`, {
     method: 'POST',
@@ -344,12 +358,20 @@ export async function adminCreateClient(name){
   return await res.json();
 }
 
-export async function adminCreateEvent(clientId, name){
+export async function adminCreateEvent(clientId, name, slug){
   const res = await fetch(`${REST}/rpc/create_event_admin`, {
     method: 'POST',
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_client_id: clientId, p_name: name })
+    body: JSON.stringify({ p_client_id: clientId, p_name: name, p_slug: slug || null })
   });
-  if(!res.ok) throw new Error('Supabase create_event_admin failed: ' + res.status);
+  if(!res.ok){
+    const text = await res.text();
+    if(text.includes('events_slug_key')){
+      const err = new Error('slug_taken');
+      err.code = 'slug_taken';
+      throw err;
+    }
+    throw new Error('Supabase create_event_admin failed: ' + res.status);
+  }
   return await res.json();
 }
