@@ -2,11 +2,13 @@
 /*
  * Unattended stress/concurrency test for the Judge D Show Supabase backend.
  *
- * Exercises the exact REST/RPC calls src/api.js makes (upsert scores, replace_config,
- * fetchScores) at real concurrency, entirely against a disposable synthetic event
- * (id "stress-test-evt") so it never touches real event/judge/contestant/score data.
- * The script creates that event, runs its scenarios, then deletes it -- it cleans up
- * any leftovers from a crashed previous run first, too.
+ * Exercises the exact REST/RPC calls src/api.js makes (upsert scores,
+ * replace_event_config, fetchScores) at real concurrency, entirely against a
+ * disposable synthetic event created fresh each run under the "Internal Test
+ * / Sandbox" client (via create_event_admin) -- it never touches real
+ * event/judge/contestant/score data. The script cleans up any leftover
+ * disposable events from a crashed previous run first, creates a new one,
+ * runs its scenarios, then deletes it via delete_event_own.
  *
  * Requires Node 18+ (built-in fetch). No other dependencies.
  *
@@ -29,8 +31,16 @@ const SUPABASE_KEY = 'sb_publishable_ahi2YrsAURh98_DGfM1Hfw_sRw9T34B';
 const REST = `${SUPABASE_URL}/rest/v1`;
 const AUTH_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
-const TEST_EVENT_ID = 'stress-test-evt';
+// events/judges/categories/contestants are locked down (RLS + revoked anon
+// grants) -- reachable only through the security-definer, event-scoped RPCs
+// below. scores/score_history stay directly REST-accessible (see CONTEXT.md's
+// "Client-level data isolation" section), so upsertScore/fetchScores below
+// still hit /scores directly.
+const STRESS_EVENT_NAME = 'Stress Test Event (disposable)';
+const SANDBOX_CLIENT_NAME = 'Internal Test / Sandbox';
 const TEST_CATEGORY_ID = 'stress-test-cat';
+
+let TEST_EVENT_ID = null; // assigned by setupTestEvent() -- create_event_admin generates it
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => {
   const [k, v] = a.replace(/^--/, '').split('=');
@@ -96,49 +106,47 @@ async function fetchScores(){
   return res.json();
 }
 
+async function findSandboxClientId(){
+  const { data: clients } = await rpc('list_clients_admin', {});
+  const sandbox = (clients || []).find(c => c.name === SANDBOX_CLIENT_NAME);
+  if(!sandbox) throw new Error(`sandbox client "${SANDBOX_CLIENT_NAME}" not found -- create it once via /app?admin=1 before running this script`);
+  return sandbox.id;
+}
+
+async function cleanupLeftoverStressEvents(){
+  const { data: events } = await rpc('list_events_admin', {});
+  const leftovers = (events || []).filter(e => e.name === STRESS_EVENT_NAME);
+  for(const e of leftovers){
+    await rpc('delete_event_own', { p_event_id: e.id });
+  }
+  return leftovers.length;
+}
+
 async function cleanupTestEvent(){
-  // events delete cascades to judges/categories/contestants (FK ON DELETE CASCADE);
-  // scores/score_history have no FK to events, so they're cleaned up explicitly.
-  await rest(`/events?id=eq.${TEST_EVENT_ID}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-  await rest(`/scores?event_id=eq.${TEST_EVENT_ID}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-  await rest(`/score_history?event_id=eq.${TEST_EVENT_ID}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  if(!TEST_EVENT_ID) return;
+  await rpc('delete_event_own', { p_event_id: TEST_EVENT_ID });
 }
 
 async function setupTestEvent(){
-  await cleanupTestEvent(); // remove any leftovers from a crashed previous run
+  const removed = await cleanupLeftoverStressEvents(); // remove any leftovers from a crashed previous run
+  if(removed) console.log(`  (cleaned up ${removed} leftover stress-test event(s) from a previous run)`);
 
-  const { res: evRes } = await rest('/events', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify([{ id: TEST_EVENT_ID, name: 'Stress Test Event (disposable)', active: true }])
-  });
-  if(!evRes.ok) throw new Error(`create test event -> ${evRes.status}: ${await evRes.text()}`);
+  const clientId = await findSandboxClientId();
+  const { data: eventId } = await rpc('create_event_admin', { p_client_id: clientId, p_name: STRESS_EVENT_NAME });
+  TEST_EVENT_ID = eventId;
 
   const judges = Array.from({ length: CONCURRENCY }, (_, i) => ({
-    event_id: TEST_EVENT_ID, slot: `Judge ${i}`, real_name: `Stress Judge ${i}`, pin: null
+    name: `Judge ${i}`, realName: `Stress Judge ${i}`, pin: null
   }));
-  const { res: jRes } = await rest('/judges', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(judges)
-  });
-  if(!jRes.ok) throw new Error(`create test judges -> ${jRes.status}: ${await jRes.text()}`);
-
-  const { res: catRes } = await rest('/categories', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify([{
-      id: TEST_CATEGORY_ID, event_id: TEST_EVENT_ID, name: 'Stress Category', entry_type: 'individual',
-      criteria: [{ key: 'k1', label: 'Criterion', max: 100 }]
-    }])
-  });
-  if(!catRes.ok) throw new Error(`create test category -> ${catRes.status}: ${await catRes.text()}`);
-
   const contestants = Array.from({ length: CONTESTANT_COUNT }, (_, i) => ({
-    id: `${TEST_CATEGORY_ID}-ct${i}`, category_id: TEST_CATEGORY_ID, band: `Stress Band ${i}`, assigned_judges: []
+    id: `${TEST_CATEGORY_ID}-ct${i}`, band: `Stress Band ${i}`, assignedJudges: []
   }));
-  const { res: ctRes } = await rest('/contestants', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(contestants)
-  });
-  if(!ctRes.ok) throw new Error(`create test contestants -> ${ctRes.status}: ${await ctRes.text()}`);
+  const categories = [{
+    id: TEST_CATEGORY_ID, name: 'Stress Category', entryType: 'individual',
+    criteria: [{ key: 'k1', label: 'Criterion', max: 100 }], contestants
+  }];
+
+  await rpc('replace_event_config', { p_event_id: TEST_EVENT_ID, p_event: { judges, categories }, p_expected_rev: 0 });
 
   return contestants.map(c => c.id);
 }
@@ -210,18 +218,23 @@ async function scenarioSustainedLoad(contestantIds){
   console.log(`    latency: p50=${percentile(sorted,50)}ms p95=${percentile(sorted,95)}ms p99=${percentile(sorted,99)}ms max=${sorted[sorted.length-1]||0}ms`);
 }
 
-// Scenario 4: concurrent organizer setup saves. replace_config's optimistic-rev
-// lock should let exactly one of N simultaneous saves starting from the same rev
-// succeed, and reject the rest with config_rev_conflict -- never silently let a
+// Scenario 4: concurrent organizer setup saves. replace_event_config's
+// optimistic-rev lock (scoped to this one disposable event) should let
+// exactly one of N simultaneous saves starting from the same rev succeed,
+// and reject the rest with config_rev_conflict -- never silently let a
 // later save clobber an earlier one.
 async function scenarioConfigOptimisticLock(){
   section(`Scenario 4: ${CONCURRENCY} concurrent config saves starting from the same rev`);
-  const { data: cfg } = await rpc('get_config', {});
+  const { data: cfg } = await rpc('get_event_config', { p_event_id: TEST_EVENT_ID });
   const baseRev = cfg._rev;
 
   const attempts = await Promise.allSettled(
-    Array.from({ length: CONCURRENCY }, (_, i) =>
-      rpc('replace_config', { p_events: cfg.events, p_expected_rev: baseRev })
+    Array.from({ length: CONCURRENCY }, () =>
+      rpc('replace_event_config', {
+        p_event_id: TEST_EVENT_ID,
+        p_event: { judges: cfg.judges, categories: cfg.categories },
+        p_expected_rev: baseRev
+      })
     )
   );
   const succeeded = attempts.filter(a => a.status === 'fulfilled');
@@ -237,13 +250,13 @@ async function scenarioConfigOptimisticLock(){
 
 async function main(){
   console.log(`Stress test config: concurrency=${CONCURRENCY} rounds=${ROUNDS} contestants=${CONTESTANT_COUNT} keep=${KEEP}`);
-  console.log(`Target: ${SUPABASE_URL} (disposable event id "${TEST_EVENT_ID}")`);
+  console.log(`Target: ${SUPABASE_URL} (disposable event created fresh under "${SANDBOX_CLIENT_NAME}")`);
 
   let contestantIds;
   try{
     section('Setup: creating disposable synthetic event');
     contestantIds = await setupTestEvent();
-    pass('synthetic test event created', `${CONTESTANT_COUNT} contestants, ${CONCURRENCY} judges`);
+    pass('synthetic test event created', `${TEST_EVENT_ID} -- ${CONTESTANT_COUNT} contestants, ${CONCURRENCY} judges`);
   }catch(e){
     fail('synthetic test event created', e.message);
     console.error('\nSetup failed -- aborting without running scenarios.');
@@ -264,7 +277,7 @@ async function main(){
     try{ await cleanupTestEvent(); pass('disposable test event removed'); }
     catch(e){ fail('disposable test event removed', e.message); }
   } else {
-    console.log('\n--keep set: leaving stress-test-evt in place for inspection.');
+    console.log(`\n--keep set: leaving ${TEST_EVENT_ID} in place for inspection.`);
   }
 
   console.log(`\n${'='.repeat(60)}`);
