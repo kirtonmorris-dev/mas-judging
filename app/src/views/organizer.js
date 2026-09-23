@@ -1,6 +1,5 @@
-import { fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit, saveScoresMerge } from '../api.js';
-import { ORG_PIN, cloneTemplate, normalizeConfig } from '../constants.js';
-import { fixBaltimoreCorrections, loadBaltimoreHistorical, loadWIADCAJuniorData } from '../historicalLoaders.js';
+import { deleteEventOwn, fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit } from '../api.js';
+import { ORG_PIN, cloneTemplate } from '../constants.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
 import { render } from '../main.js';
 import { printAllSignoffSheets, printBlankSheets, printSignoffSheet } from '../print.js';
@@ -47,68 +46,22 @@ export function renderOrganizer(){
 }
 
 export function attachOrganizerHandlers(){
-  const evSel = document.getElementById('eventSelect');
-  if(evSel) evSel.onchange = (e)=>{
-    if(e.target.value === '__add__'){
-      evSel.value = state.eventId || '';
-      document.getElementById('newEventNameInline').style.display = 'block';
-      document.getElementById('createEventInlineBtn').style.display = 'block';
-      document.getElementById('newEventNameInline').focus();
-      return;
-    }
-    state.eventId = e.target.value; state.categoryId=null; state.orgEditKey=null; render();
-  };
-
-  const createEventBtn = document.getElementById('createEventInlineBtn');
-  if(createEventBtn) createEventBtn.onclick = async ()=>{
-    const input = document.getElementById('newEventNameInline');
-    const name = input.value.trim();
-    if(!name) return;
-    const newEv = { id: uid(), name, judges: [], categories: [] };
-    state.config.events.push(newEv);
-    normalizeConfig(state.config);
-    await saveConfig();
-    state.eventId = newEv.id;
-    state.categoryId = null;
-    render();
-  };
-
   const removeEventBtn = document.getElementById('removeCurrentEventBtn');
   if(removeEventBtn) removeEventBtn.onclick = async ()=>{
     const ev = currentEvent();
     if(!ev) return;
     if(!confirm(`Remove "${ev.name}"? This deletes its judges, categories, contestants, and scores. This cannot be undone.`)) return;
-    const id = ev.id;
-    state.config.events = state.config.events.filter(e=>e.id!==id);
-    state.eventId = state.config.events.length ? state.config.events[0].id : null;
-    await saveConfig();
-    await saveScoresMerge(scores=>{
-      Object.keys(scores).forEach(k=>{
-        if(k.startsWith(id + '|')) delete scores[k];
-      });
-    });
-    render();
-  };
-
-  const loadHistBtn = document.getElementById('loadBaltimoreHistBtn');
-  if(loadHistBtn) loadHistBtn.onclick = async ()=>{
-    loadHistBtn.disabled = true;
-    loadHistBtn.textContent = 'Loading\u2026';
-    await loadBaltimoreHistorical();
-  };
-
-  const fixBtn = document.getElementById('fixBaltimoreBtn');
-  if(fixBtn) fixBtn.onclick = async ()=>{
-    fixBtn.disabled = true;
-    fixBtn.textContent = 'Applying\u2026';
-    await fixBaltimoreCorrections();
-  };
-
-  const loadWiadcaBtn = document.getElementById('loadWiadcaBtn');
-  if(loadWiadcaBtn) loadWiadcaBtn.onclick = async ()=>{
-    loadWiadcaBtn.disabled = true;
-    loadWiadcaBtn.textContent = 'Loading\u2026';
-    await loadWIADCAJuniorData();
+    removeEventBtn.disabled = true;
+    removeEventBtn.textContent = 'Removing\u2026';
+    try{
+      await deleteEventOwn(ev.id);
+      document.getElementById('app').innerHTML = '<div class="empty">This event has been removed. Ask your admin for a new link.</div>';
+    }catch(e){
+      console.error('delete event failed', e);
+      showToast('Could not remove event \u2014 check connection', true);
+      removeEventBtn.disabled = false;
+      removeEventBtn.textContent = 'Remove this event';
+    }
   };
 
   const orgTabs = document.querySelectorAll('[data-org-tab]');

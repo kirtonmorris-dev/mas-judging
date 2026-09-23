@@ -146,9 +146,6 @@ export function renderScoringCard(ev, cat, contestant){
 }
 
 export function attachJudgeHandlers(){
-  const evSel = document.getElementById('eventSelect');
-  if(evSel) evSel.onchange = (e)=>{ state.eventId = e.target.value; state.judge=null; state.judgeUnlocked=false; state.categoryId=null; state.contestantId=null; render(); };
-
   const jSel = document.getElementById('judgeSelect');
   if(jSel) jSel.onchange = (e)=>{ state.judge = e.target.value || null; state.judgeUnlocked=false; state.categoryId=null; state.contestantId=null; render(); };
 

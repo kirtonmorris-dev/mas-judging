@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, SUPABASE_KEY, SUPABASE_URL, normalizeConfig } from './constants.js';
+import { SUPABASE_KEY, SUPABASE_URL, normalizeConfig } from './constants.js';
 import { render } from './main.js';
 import { state } from './state.js';
 import { renderPennants, showToast } from './ui.js';
@@ -6,21 +6,27 @@ import { renderPennants, showToast } from './ui.js';
 const REST = `${SUPABASE_URL}/rest/v1`;
 const AUTH_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
-async function fetchConfig(){
-  const res = await fetch(`${REST}/rpc/get_config`, {
+// Every read/write below is scoped to a single event_id -- never the whole
+// database -- so a judge or organizer link for one event can never surface
+// another event's (and therefore another client's) judges, PINs, contestants,
+// or scores. The only exception is the separate admin.js code path, which
+// exists specifically to see across events and is PIN-gated on its own.
+
+async function fetchEventConfig(eventId){
+  const res = await fetch(`${REST}/rpc/get_event_config`, {
     method: 'POST',
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: '{}'
+    body: JSON.stringify({ p_event_id: eventId })
   });
-  if(!res.ok) throw new Error('Supabase get_config failed: ' + res.status);
+  if(!res.ok) throw new Error('Supabase get_event_config failed: ' + res.status);
   return await res.json();
 }
 
-async function replaceConfig(events, expectedRev){
-  const res = await fetch(`${REST}/rpc/replace_config`, {
+async function replaceEventConfig(eventId, eventData, expectedRev){
+  const res = await fetch(`${REST}/rpc/replace_event_config`, {
     method: 'POST',
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_events: events, p_expected_rev: expectedRev ?? null })
+    body: JSON.stringify({ p_event_id: eventId, p_event: eventData, p_expected_rev: expectedRev ?? null })
   });
   if(!res.ok){
     const text = await res.text();
@@ -29,13 +35,26 @@ async function replaceConfig(events, expectedRev){
       err.code = 'config_rev_conflict';
       throw err;
     }
-    throw new Error('Supabase replace_config failed: ' + res.status);
+    throw new Error('Supabase replace_event_config failed: ' + res.status);
   }
   return await res.json();
 }
 
-export async function fetchScores(){
-  const res = await fetch(`${REST}/scores?select=event_id,category_id,contestant_id,judge_slot,values`, { headers: AUTH_HEADERS });
+export async function deleteEventOwn(eventId){
+  const res = await fetch(`${REST}/rpc/delete_event_own`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_event_id: eventId })
+  });
+  if(!res.ok) throw new Error('Supabase delete_event_own failed: ' + res.status);
+}
+
+export async function fetchScores(eventId){
+  const params = new URLSearchParams({
+    event_id: `eq.${eventId}`,
+    select: 'event_id,category_id,contestant_id,judge_slot,values'
+  });
+  const res = await fetch(`${REST}/scores?${params}`, { headers: AUTH_HEADERS });
   if(!res.ok) throw new Error('Supabase scores GET failed: ' + res.status);
   const rows = await res.json();
   const scores = {};
@@ -133,38 +152,39 @@ export async function fetchScoreHistoryForCategory(eventId, categoryId){
 }
 
 export async function loadAll(){
-  let cfg, cfgFetchOk = true;
-  try{ cfg = await fetchConfig(); }
+  const eventId = state.eventId;
+  let ev, cfgFetchOk = true;
+  try{ ev = await fetchEventConfig(eventId); }
   catch(e){ console.error('config load failed', e); cfgFetchOk = false; }
 
-  if(!cfgFetchOk){
+  if(!cfgFetchOk || !ev || !ev.id){
     const loadingMsg = document.getElementById('loadingMsg');
     if(loadingMsg){
       loadingMsg.innerHTML = '';
       const msg = document.createElement('div');
-      msg.textContent = 'Could not load — check your connection.';
-      const retryBtn = document.createElement('button');
-      retryBtn.type = 'button';
-      retryBtn.className = 'btn btn-outline-light btn-small';
-      retryBtn.style.marginTop = '12px';
-      retryBtn.textContent = 'Retry';
-      retryBtn.onclick = ()=>{ loadingMsg.textContent = 'Loading scoresheet…'; loadAll(); };
+      msg.textContent = cfgFetchOk
+        ? 'This link does not point to a valid event. Ask your organizer for the correct link.'
+        : 'Could not load — check your connection.';
       loadingMsg.appendChild(msg);
-      loadingMsg.appendChild(retryBtn);
+      if(!cfgFetchOk){
+        const retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'btn btn-outline-light btn-small';
+        retryBtn.style.marginTop = '12px';
+        retryBtn.textContent = 'Retry';
+        retryBtn.onclick = ()=>{ loadingMsg.textContent = 'Loading scoresheet…'; loadAll(); };
+        loadingMsg.appendChild(retryBtn);
+      }
     }
-    showToast('Could not reach the database — check connection', true);
+    showToast(cfgFetchOk ? 'Invalid event link' : 'Could not reach the database — check connection', true);
     return;
   }
 
-  if(!cfg || !Array.isArray(cfg.events) || !cfg.events.length){
-    cfg = { ...DEFAULT_CONFIG, _rev: (cfg && cfg._rev) ?? 0 };
-  }
-  cfg = normalizeConfig(cfg);
+  const cfg = normalizeConfig({ events: [ev], _rev: ev._rev ?? 0 });
   state.config = cfg;
-  if(!state.eventId && cfg.events.length) state.eventId = cfg.events[0].id;
 
   let sc = null;
-  try{ sc = await fetchScores(); } catch(e){ console.error('scores load failed', e); }
+  try{ sc = await fetchScores(eventId); } catch(e){ console.error('scores load failed', e); }
   state.scores = sc || {};
 
   document.getElementById('loadingMsg').style.display='none';
@@ -174,8 +194,10 @@ export async function loadAll(){
 }
 
 export async function saveConfig(){
+  const ev = state.config.events[0];
   try{
-    const newRev = await replaceConfig(state.config.events, state.config._rev);
+    const newRev = await replaceEventConfig(ev.id, ev, ev._rev ?? state.config._rev);
+    ev._rev = newRev;
     state.config._rev = newRev;
     return true;
   }catch(e){
@@ -193,8 +215,9 @@ export async function saveConfig(){
 }
 
 export async function saveScoresMerge(mutateFn){
+  const eventId = state.eventId;
   try{
-    let latest = await fetchScores();
+    let latest = await fetchScores(eventId);
     if(!latest) latest = {};
     const before = {...latest};
     mutateFn(latest);
@@ -202,8 +225,8 @@ export async function saveScoresMerge(mutateFn){
     const upsertRows = [];
     Object.keys(latest).forEach(key => {
       if(latest[key] !== before[key]){
-        const [eventId, categoryId, contestantId, judgeSlot] = key.split('|');
-        upsertRows.push(scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, latest[key]));
+        const [eId, categoryId, contestantId, judgeSlot] = key.split('|');
+        upsertRows.push(scoreRowFromEntry(eId, categoryId, contestantId, judgeSlot, latest[key]));
       }
     });
     const deleteKeys = Object.keys(before).filter(k => !(k in latest));
@@ -291,4 +314,42 @@ export async function saveOrganizerScoreEdit(key){
     });
     return false;
   }
+}
+
+// --- Admin-only calls (see views/admin.js). Every one of these is the ONLY
+// place in the app allowed to see or create data across more than one event.
+export async function adminListEvents(){
+  const res = await fetch(`${REST}/rpc/list_events_admin`, {
+    method: 'POST', headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' }, body: '{}'
+  });
+  if(!res.ok) throw new Error('Supabase list_events_admin failed: ' + res.status);
+  return await res.json();
+}
+
+export async function adminListClients(){
+  const res = await fetch(`${REST}/rpc/list_clients_admin`, {
+    method: 'POST', headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' }, body: '{}'
+  });
+  if(!res.ok) throw new Error('Supabase list_clients_admin failed: ' + res.status);
+  return await res.json();
+}
+
+export async function adminCreateClient(name){
+  const res = await fetch(`${REST}/rpc/create_client_admin`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_name: name })
+  });
+  if(!res.ok) throw new Error('Supabase create_client_admin failed: ' + res.status);
+  return await res.json();
+}
+
+export async function adminCreateEvent(clientId, name){
+  const res = await fetch(`${REST}/rpc/create_event_admin`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_client_id: clientId, p_name: name })
+  });
+  if(!res.ok) throw new Error('Supabase create_event_admin failed: ' + res.status);
+  return await res.json();
 }

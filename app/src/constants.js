@@ -13,34 +13,12 @@ export const CRITERIA_TEMPLATE = [
 
 export const ORG_PIN = '2026';
 
-export function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
+// Gate for the admin view (/app?admin=1) -- the ONLY place that can see across
+// clients/events, list them, or create a new event. Change this before sharing
+// any link publicly; it is not a secret-strength value as shipped.
+export const ADMIN_PIN = '738104';
 
-export const DEFAULT_CONFIG = {
-  events: [
-    {
-      id: 'baltimore-one-carnival',
-      name: 'Baltimore One Carnival',
-      judges: ['Judge 1','Judge 2','Judge 3'],
-      categories: [
-        {
-          id: 'adult-female-individual',
-          name: 'Adult Female Individual',
-          entryType: 'individual',
-          criteria: cloneTemplate(),
-          contestants: [
-            {id:'c1', band:'East Coast Limers', masquerader:'Alana Dopson', portrayal:'Pink - The Love Illusion', assignedJudges:['Judge 1','Judge 2','Judge 3']},
-            {id:'c2', band:'East Coast Limers', masquerader:'Selah Thom', portrayal:'The Sand Dancer', assignedJudges:['Judge 1','Judge 2','Judge 3']},
-            {id:'c3', band:'Jackie and Associates', masquerader:'Pearl Wallace', portrayal:'The Song of Rapso', assignedJudges:['Judge 1','Judge 2','Judge 3']},
-            {id:'c4', band:'Dreamerz Carnival', masquerader:'Kierra Charles', portrayal:'Portrayal of Fer-de-lance', assignedJudges:['Judge 1','Judge 2','Judge 3']},
-            {id:'c5', band:'Dreamerz Carnival', masquerader:'Maryze Williams', portrayal:'Portrayal of Scarlet Macaw', assignedJudges:['Judge 1','Judge 2','Judge 3']},
-          ]
-        }
-      ]
-    },
-    { id: 'ny-kiddies-carnival', name: 'NY Carnival — Kiddies (Saturday)', judges: [], categories: [] },
-    { id: 'ny-adult-carnival', name: 'NY Carnival — Adult (Monday)', judges: [], categories: [] },
-  ]
-};
+export function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
 
 // Defaults chosen so an event/category saved before the competition
 // taxonomy existed renders and behaves exactly as it did before: the

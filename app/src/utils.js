@@ -1,6 +1,10 @@
 import { state } from './state.js';
 
-export function uid(){ return Math.random().toString(36).slice(2,9); }
+// crypto.randomUUID() rather than Math.random() -- new categories/contestants
+// get an unguessable id, which matters now that scores/score_history stay
+// directly queryable by id (see CONTEXT.md's isolation writeup). Existing
+// rows keep their original short ids; this only affects newly created ones.
+export function uid(){ return crypto.randomUUID(); }
 
 export function scoreKey(eventId, catId, contestantId, judge){ return [eventId, catId, contestantId, judge].join('|'); }
 
