@@ -348,6 +348,23 @@ export async function adminListClients(){
   return await res.json();
 }
 
+export async function adminDeleteClient(clientId){
+  const res = await fetch(`${REST}/rpc/delete_client_admin`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_client_id: clientId })
+  });
+  if(!res.ok){
+    const text = await res.text();
+    if(text.includes('client_has_events')){
+      const err = new Error('client_has_events');
+      err.code = 'client_has_events';
+      throw err;
+    }
+    throw new Error('Supabase delete_client_admin failed: ' + res.status);
+  }
+}
+
 export async function adminCreateClient(name){
   const res = await fetch(`${REST}/rpc/create_client_admin`, {
     method: 'POST',
