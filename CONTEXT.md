@@ -586,9 +586,77 @@ Organizer PIN: `2026` (`ORG_PIN` in `src/constants.js`, not in Supabase) —
 one shared value across every event/client, see the isolation section's
 "known, not-yet-fixed gap" above.
 
-Admin PIN: `738104` (`ADMIN_PIN` in `src/constants.js`) — gates `/app?admin=1`
-only, unrelated to `ORG_PIN`. Change it before sharing an admin link
-publicly; it was set as a placeholder, not chosen for strength.
+Admin PIN: moved server-side 2026-09-24 (see "Admin auth moved server-side"
+below) — no longer a client constant.
+
+## Admin auth moved server-side (2026-09-24)
+
+**The problem this fixed**: `ADMIN_PIN` used to be a plaintext constant in
+`src/constants.js`, shipped in the browser bundle to every judge/organizer
+page (not just `/app?admin=1`) — anyone could read it via view-source. Worse,
+that PIN never actually gated anything at the database level: the five
+admin-only RPCs (`list_events_admin`, `list_clients_admin`,
+`create_client_admin`, `create_event_admin`, `delete_client_admin`) were
+`security definer` functions with `EXECUTE` granted to `anon` — and, it turned
+out, also still granted to `PUBLIC` from function-creation time, which `anon`
+inherits regardless of its own grant. Anyone with the public Supabase URL +
+publishable key (both already shipped in `constants.js` by design) could call
+these directly via REST — list every client/event across the whole database,
+or create a new one — with or without ever knowing the PIN. The PIN screen in
+`views/admin.js` was a client-side-only UI gate the whole time.
+
+**What changed**:
+
+- New `/api/admin/*` Vercel serverless functions (`api/admin/auth.js`,
+  `list-clients.js`, `list-events.js`, `create-client.js`,
+  `create-event.js`, `delete-client.js`), plus a shared helper
+  `api/_lib/adminAuth.js` (files under `api/` prefixed `_` aren't deployed
+  as routes). `ADMIN_PIN` now lives only as a Vercel server env var, checked
+  once in `auth.js`. On success it issues a stateless HMAC-signed token
+  (`ADMIN_TOKEN_SECRET` env var, 1-hour TTL, `crypto.timingSafeEqual`
+  comparison) — no session storage needed. Every other admin endpoint
+  requires that token and calls the underlying RPC using
+  `SUPABASE_SERVICE_ROLE_KEY` (also server-only, bypasses grants entirely),
+  never the publishable key.
+- **DB migrations `lock_down_admin_rpcs` and
+  `lock_down_admin_rpcs_revoke_public`** (applied directly to
+  `pjqojhtqxljnukwlzekr`, both via Supabase MCP, 2026-09-24): revoked
+  `EXECUTE` on the five admin RPCs from both `anon` and `PUBLIC`. Two
+  migrations because the first pass (revoke from `anon` only) looked
+  sufficient from `aclexplode()` output but wasn't —
+  `has_function_privilege('anon', ...)` still returned `true` afterward,
+  because Postgres grants `EXECUTE` to `PUBLIC` on function creation by
+  default and `anon` inherits through that regardless of its own explicit
+  grant. **If auditing RPC grants again, use `has_function_privilege()`,
+  not a role-name filter on `aclexplode()`** — the latter silently drops the
+  `PUBLIC` grantee row (it isn't a real role, so it won't join to
+  `pg_roles`), which is exactly how this got missed the first time.
+  `delete_event_own`/`get_event_config`/`replace_event_config`/
+  `resolve_event_slug` were deliberately left untouched — those stay
+  `anon`-callable by design, since the judge/organizer flow has no server
+  boundary and was never the thing this fix targeted.
+- **`app/src/views/admin.js`'s PIN gate now calls `adminLogin(pin)`**
+  (`api.js`, POSTs to `/api/admin/auth`) instead of comparing against a
+  client constant, and stores the returned token in `state.adminToken`.
+  Every subsequent admin call (`adminListClients`, `adminListEvents`,
+  `adminCreateClient`, `adminCreateEvent`, `adminDeleteClient`) now takes
+  `token` as its first argument and hits the matching `/api/admin/*`
+  endpoint instead of Supabase directly. A 401 from any of them (expired or
+  invalid token) drops the UI back to the PIN gate
+  (`handleAdminAuthError` in `admin.js`) rather than failing silently.
+- **Vercel env vars required** (server-only, never in the repo):
+  `ADMIN_PIN`, `ADMIN_TOKEN_SECRET` (32+ random bytes, unrelated to
+  `ADMIN_PIN`), `SUPABASE_SERVICE_ROLE_KEY` (from Supabase dashboard →
+  Settings → API — never the publishable key), `SUPABASE_URL` (same value
+  already in `src/constants.js`). Set under Project Settings → Environment
+  Variables, Production (and Preview if admin needs testing on preview
+  deploys). **Not yet set as of this writeup** — the code and DB sides are
+  done and verified, but the admin view will not work in production until
+  these are added; find out before assuming this is fully deployed.
+- `ORG_PIN`'s shared-across-events gap (see "Client-level data isolation"
+  above) is **not** fixed by this change — this was specifically the admin
+  PIN's client-side exposure and its RPCs' anon-callability. Per-event
+  organizer PINs are still open, tracked separately.
 
 ## Things intentionally NOT built (don't assume otherwise)
 

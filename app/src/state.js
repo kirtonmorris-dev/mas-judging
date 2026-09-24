@@ -21,6 +21,7 @@ export let state = {
   scoreHistoryCache: {},
   historyPanelCategoryId: null,
   adminUnlocked: false,
+  adminToken: null,
   adminClients: null,
   adminEvents: null,
 };

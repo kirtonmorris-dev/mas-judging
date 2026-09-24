@@ -330,65 +330,63 @@ export async function saveOrganizerScoreEdit(key){
   }
 }
 
-// --- Admin-only calls (see views/admin.js). Every one of these is the ONLY
-// place in the app allowed to see or create data across more than one event.
-export async function adminListEvents(){
-  const res = await fetch(`${REST}/rpc/list_events_admin`, {
-    method: 'POST', headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' }, body: '{}'
-  });
-  if(!res.ok) throw new Error('Supabase list_events_admin failed: ' + res.status);
-  return await res.json();
-}
-
-export async function adminListClients(){
-  const res = await fetch(`${REST}/rpc/list_clients_admin`, {
-    method: 'POST', headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' }, body: '{}'
-  });
-  if(!res.ok) throw new Error('Supabase list_clients_admin failed: ' + res.status);
-  return await res.json();
-}
-
-export async function adminDeleteClient(clientId){
-  const res = await fetch(`${REST}/rpc/delete_client_admin`, {
+// --- Admin-only calls (see views/admin.js). Every one of these goes through
+// a /api/admin/* serverless function, not straight to Supabase -- the
+// underlying RPCs (list_events_admin, list_clients_admin, create_client_admin,
+// create_event_admin, delete_client_admin) had their `anon` EXECUTE grant
+// revoked (see the lock_down_admin_rpcs migration), so the publishable key
+// alone can no longer reach them. The server checks ADMIN_PIN and issues the
+// token these calls carry -- see api/admin/auth.js and adminLogin() below.
+// This replaced the old design where these RPCs were anon-callable and the
+// admin PIN was only ever checked in the browser (a client-shipped constant
+// gating nothing at the API level).
+async function adminApi(path, body){
+  const res = await fetch(`/api/admin/${path}`, {
     method: 'POST',
-    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_client_id: clientId })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
   });
-  if(!res.ok){
-    const text = await res.text();
-    if(text.includes('client_has_events')){
-      const err = new Error('client_has_events');
-      err.code = 'client_has_events';
-      throw err;
-    }
-    throw new Error('Supabase delete_client_admin failed: ' + res.status);
+  if(res.status === 401){
+    const err = new Error('admin_unauthorized');
+    err.code = 'admin_unauthorized';
+    throw err;
   }
-}
-
-export async function adminCreateClient(name){
-  const res = await fetch(`${REST}/rpc/create_client_admin`, {
-    method: 'POST',
-    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_name: name })
-  });
-  if(!res.ok) throw new Error('Supabase create_client_admin failed: ' + res.status);
-  return await res.json();
-}
-
-export async function adminCreateEvent(clientId, name, slug){
-  const res = await fetch(`${REST}/rpc/create_event_admin`, {
-    method: 'POST',
-    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_client_id: clientId, p_name: name, p_slug: slug || null })
-  });
   if(!res.ok){
-    const text = await res.text();
-    if(text.includes('events_slug_key')){
-      const err = new Error('slug_taken');
-      err.code = 'slug_taken';
-      throw err;
-    }
-    throw new Error('Supabase create_event_admin failed: ' + res.status);
+    const data = await res.json().catch(()=>({}));
+    const err = new Error(`admin/${path} failed: ` + res.status);
+    if(data && data.error) err.code = data.error;
+    throw err;
   }
   return await res.json();
+}
+
+export async function adminLogin(pin){
+  const res = await fetch('/api/admin/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin })
+  });
+  if(!res.ok) return null;
+  const data = await res.json();
+  return data.token;
+}
+
+export async function adminListEvents(token){
+  return adminApi('list-events', { token });
+}
+
+export async function adminListClients(token){
+  return adminApi('list-clients', { token });
+}
+
+export async function adminDeleteClient(token, clientId){
+  return adminApi('delete-client', { token, clientId });
+}
+
+export async function adminCreateClient(token, name){
+  return adminApi('create-client', { token, name });
+}
+
+export async function adminCreateEvent(token, clientId, name, slug){
+  return adminApi('create-event', { token, clientId, name, slug });
 }
