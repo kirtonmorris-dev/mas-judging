@@ -26,6 +26,19 @@ export async function resolveEventSlug(slug){
   return await res.json();
 }
 
+// Per-event organizer PIN check -- replaced the old shared ORG_PIN constant
+// comparison. Safe to call with the anon key: this RPC never returns the
+// real PIN, only true/false (see the per_event_organizer_pin migration).
+export async function checkOrganizerPin(eventId, pin){
+  const res = await fetch(`${REST}/rpc/check_event_organizer_pin`, {
+    method: 'POST',
+    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_event_id: eventId, p_pin: pin })
+  });
+  if(!res.ok) throw new Error('Supabase check_event_organizer_pin failed: ' + res.status);
+  return await res.json();
+}
+
 async function fetchEventConfig(eventId){
   const res = await fetch(`${REST}/rpc/get_event_config`, {
     method: 'POST',
@@ -389,4 +402,8 @@ export async function adminCreateClient(token, name){
 
 export async function adminCreateEvent(token, clientId, name, slug){
   return adminApi('create-event', { token, clientId, name, slug });
+}
+
+export async function adminResetOrganizerPin(token, eventId){
+  return adminApi('reset-organizer-pin', { token, eventId });
 }

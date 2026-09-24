@@ -11,13 +11,19 @@ export const CRITERIA_TEMPLATE = [
   {key:'impact', label:'Visual Impact / Portability', max:20},
 ];
 
-export const ORG_PIN = '2026';
-
 // The admin PIN is no longer a client-side constant -- it moved to the
 // ADMIN_PIN server env var, checked only in api/admin/auth.js. That's what
 // actually gates the admin RPCs now (their anon EXECUTE grant was revoked;
 // see the lock_down_admin_rpcs migration), not this file. See
 // views/admin.js's attachAdminGateHandlers / api.js's adminLogin.
+
+// The organizer PIN is no longer a shared client-side constant either --
+// each event now has its own organizer_pin column, checked server-side via
+// the check_event_organizer_pin RPC (see api.js's checkOrganizerPin). The
+// old ORG_PIN='2026' value lives on as every pre-existing event's PIN (the
+// per_event_organizer_pin migration backfilled it there so WIADCA's live
+// event kept working), but it's a per-row DB value now, not a constant
+// every client/event shares.
 
 export function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
 

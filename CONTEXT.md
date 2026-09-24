@@ -301,16 +301,13 @@ queryable by anyone who has a specific event's id (needed for the
 concurrency-safe upsert pattern), same risk model as before, just now
 correctly scoped to one event instead of returning everything.
 
-**Also a known, not-yet-fixed gap**: the Organizer PIN (`ORG_PIN`, `2026`)
-is one shared value across *every* event/client, not per-event. Anyone who
-knows it can open the Organizer tab for any event's link, including a
-brand-new client's. The underlying *data* is correctly isolated (that
-organizer still can't reach another client's data even with the shared
-PIN), but the PIN gate itself doesn't distinguish clients. Fixing this
-properly means a per-event organizer PIN generated at event-creation time
-in `admin.js` and stored on the `events` row — not yet built, flagged to
-the user, no decision made yet on whether it's worth doing given Kirt is
-currently the only person setting up events and handing out links/PINs.
+**Fixed 2026-09-24** (was previously a known gap here): the Organizer PIN
+used to be one shared value (`ORG_PIN`, `2026`) across *every* event/client
+— anyone who knew it could open the Organizer tab for any event's link,
+including a brand-new client's, even though the underlying data was already
+correctly isolated. Each event now has its own `organizer_pin`, generated
+at creation and resettable from the admin panel. See "Per-event organizer
+PIN" further down for the full writeup.
 
 **RLS lockdown — applied 2026-09-23.** Migration
 `drop_old_rpcs_and_lock_down_config_tables`, run directly against the
@@ -582,9 +579,10 @@ not a hardcoded ID.
 
 ## Organizer access
 
-Organizer PIN: `2026` (`ORG_PIN` in `src/constants.js`, not in Supabase) —
-one shared value across every event/client, see the isolation section's
-"known, not-yet-fixed gap" above.
+Organizer PIN: per-event now (`events.organizer_pin` in Supabase, not a
+client constant) — see "Per-event organizer PIN" below. Every pre-existing
+event kept `2026` in the backfill; new events get a random 4-digit PIN at
+creation.
 
 Admin PIN: moved server-side 2026-09-24 (see "Admin auth moved server-side"
 below) — no longer a client constant.
@@ -649,14 +647,71 @@ or create a new one — with or without ever knowing the PIN. The PIN screen in
   `ADMIN_PIN`), `SUPABASE_SERVICE_ROLE_KEY` (from Supabase dashboard →
   Settings → API — never the publishable key), `SUPABASE_URL` (same value
   already in `src/constants.js`). Set under Project Settings → Environment
-  Variables, Production (and Preview if admin needs testing on preview
-  deploys). **Not yet set as of this writeup** — the code and DB sides are
-  done and verified, but the admin view will not work in production until
-  these are added; find out before assuming this is fully deployed.
+  Variables, Production and Preview. **Set 2026-09-24, confirmed working**
+  — merged to `main`, verified live on `judgedshow.com/app?admin=1` (old
+  PIN rejected, new PIN works).
 - `ORG_PIN`'s shared-across-events gap (see "Client-level data isolation"
-  above) is **not** fixed by this change — this was specifically the admin
-  PIN's client-side exposure and its RPCs' anon-callability. Per-event
-  organizer PINs are still open, tracked separately.
+  above) was **not** fixed by this change — this was specifically the admin
+  PIN's client-side exposure and its RPCs' anon-callability. Fixed
+  separately the same day — see "Per-event organizer PIN" below.
+
+## Per-event organizer PIN (2026-09-24)
+
+**The problem this fixed**: `ORG_PIN` (`'2026'`) was a single shared
+constant gating the Organizer tab for *every* event across *every*
+client — anyone who ever learned it (a past organizer, a screenshot, a
+person from a different client entirely) could open the Organizer tab for
+any client's event link, not just the one they were given. The underlying
+*data* was already correctly isolated per event (this PIN never granted
+cross-event data access, unlike the admin RPC hole above) — but the access
+gate itself didn't distinguish clients.
+
+**What changed**:
+
+- New `events.organizer_pin` column (migration `per_event_organizer_pin`,
+  applied directly to `pjqojhtqxljnukwlzekr`). Existing events (WIADCA
+  Junior Carnival, WIADCA Monday Mas, Testing - Panorama) were backfilled
+  with `'2026'` — their existing PIN keeps working, nothing broke
+  mid-season for WIADCA. Confirmed with Kirt before applying: this was a
+  deliberate choice over rotating every existing event to a fresh PIN,
+  which would have needed re-communicating a new PIN to a live client.
+  **New events created via `create_event_admin` get a random 4-digit PIN**
+  at creation instead of inheriting anything shared.
+- New RPC `check_event_organizer_pin(p_event_id, p_pin) returns boolean` —
+  `anon`-callable (same trust model as `get_event_config`/
+  `replace_event_config`, scoped by the caller already knowing the event
+  id), but it **never returns the real PIN**, only true/false. Confirmed
+  `get_event_config` does not select `organizer_pin` in its `jsonb_build_object`
+  — so entering Judge mode never exposes the Organizer PIN in the config
+  payload either (this was checked deliberately, given it's the same
+  mistake class as the admin PIN leak above).
+- New admin-only RPC `reset_event_organizer_pin(p_event_id) returns text` —
+  generates and stores a fresh random PIN, returns it once for the admin UI
+  to display. Same lockdown pattern as the five RPCs from the admin-auth
+  fix (`anon`/`PUBLIC` `EXECUTE` revoked at creation, reachable only via the
+  service-role-backed `/api/admin/reset-organizer-pin` proxy). `list_events_admin`
+  now also returns `organizerPin` per event so the admin panel can display
+  it without a separate lookup.
+- **`app/src/views/organizer.js`'s PIN gate now calls
+  `checkOrganizerPin(eventId, pin)`** (`api.js` → `rpc/check_event_organizer_pin`,
+  anon key, no token needed — the RPC itself is the boundary) instead of
+  comparing against the removed `ORG_PIN` constant.
+- **Admin panel** (`views/admin.js`) shows each event's current organizer
+  PIN next to its Judge/Organizer links, with a "Reset PIN" button
+  (`adminResetOrganizerPin` → `/api/admin/reset-organizer-pin.js`) for when
+  a PIN needs to be rotated (leaked, forgotten, or just a fresh start for a
+  new season).
+- **No new Vercel env vars needed** — the organizer PIN check is a direct
+  anon RPC call (no proxy), and the reset endpoint reuses the
+  `ADMIN_TOKEN_SECRET`/`SUPABASE_SERVICE_ROLE_KEY` already set for the
+  admin-auth fix above.
+- **Known, accepted limitation, not fixed here**: `check_event_organizer_pin`
+  has no rate limiting or lockout — a script could brute-force a 4-digit PIN
+  against a known event id in well under a minute. Same risk class as the
+  judge PIN check, which has always worked this way. Worth hardening (e.g.
+  an attempt-count column + short lockout) before this handles a client
+  whose organizer PIN protects something more sensitive than tally
+  visibility, but not done as part of this fix — flagged, not solved.
 
 ## Things intentionally NOT built (don't assume otherwise)
 
@@ -670,8 +725,9 @@ or create a new one — with or without ever knowing the PIN. The PIN screen in
   isn't enforced at the DB layer now (the RLS lockdown migration is done —
   `events`/`judges`/`categories`/`contestants` are anon-inaccessible
   directly, and the old whole-database RPCs are dropped).
-- No per-event organizer PIN — one shared `ORG_PIN` for every event/client
-  (see "Client-level data isolation" above).
+- Per-event organizer PINs shipped 2026-09-24 (see "Per-event organizer
+  PIN" above) — no rate limiting/lockout on the PIN check, same as the
+  judge PIN, flagged there as an accepted gap, not fixed.
 
 ## Copyright / ownership note
 

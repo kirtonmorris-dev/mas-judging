@@ -1,5 +1,5 @@
-import { deleteEventOwn, fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit } from '../api.js';
-import { ORG_PIN, cloneTemplate } from '../constants.js';
+import { checkOrganizerPin, deleteEventOwn, fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit } from '../api.js';
+import { cloneTemplate } from '../constants.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
 import { render } from '../main.js';
 import { printAllSignoffSheets, printBlankSheets, printSignoffSheet } from '../print.js';
@@ -20,11 +20,37 @@ export function renderPinGate(){
   </div>`;
 }
 
+// PIN is checked server-side now, per event (check_event_organizer_pin RPC)
+// -- replaced the old shared ORG_PIN constant comparison. See CONTEXT.md's
+// "Per-event organizer PIN" writeup for why: the constant gated every
+// event/client with the same value, so anyone who ever learned it could
+// open the Organizer tab for any client's event link.
 export function attachPinHandlers(){
-  document.getElementById('pinSubmit').onclick = ()=>{
+  const submitBtn = document.getElementById('pinSubmit');
+  submitBtn.onclick = async ()=>{
     const val = document.getElementById('pinInput').value.trim();
-    if(val === ORG_PIN){ state.orgUnlocked = true; render(); }
-    else { document.getElementById('pinErr').style.display='block'; }
+    const errEl = document.getElementById('pinErr');
+    errEl.style.display = 'none';
+    const ev = currentEvent();
+    if(!ev) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Checking…';
+    try{
+      const ok = await checkOrganizerPin(ev.id, val);
+      if(ok){ state.orgUnlocked = true; render(); }
+      else {
+        errEl.textContent = 'Incorrect PIN. Ask Kirt for the organizer PIN.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Unlock';
+      }
+    }catch(e){
+      console.error('organizer pin check failed', e);
+      errEl.textContent = 'Could not reach the server — check connection.';
+      errEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Unlock';
+    }
   };
 }
 
