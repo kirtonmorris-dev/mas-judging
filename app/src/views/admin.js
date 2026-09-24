@@ -1,12 +1,12 @@
 // Admin view -- reached ONLY via /app?admin=1, gated by its own PIN
-// (ADMIN_PIN, separate from ORG_PIN). This is the one place in the app
-// allowed to see every client and every event side by side, and the only
-// place that can mint a new event. It never shares a query with the judge
-// or organizer views (see api.js's adminListEvents/adminListClients/
-// adminCreateEvent, all separate RPCs from the event-scoped ones those
-// views use) -- so there is no flag anywhere that widens a normal
-// session's access into this one.
-import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, deleteEventOwn } from '../api.js';
+// (ADMIN_PIN, separate from each event's own organizer_pin). This is the
+// one place in the app allowed to see every client and every event side by
+// side, and the only place that can mint a new event or reset an event's
+// organizer PIN. It never shares a query with the judge or organizer views
+// (see api.js's adminListEvents/adminListClients/adminCreateEvent, all
+// separate RPCs from the event-scoped ones those views use) -- so there is
+// no flag anywhere that widens a normal session's access into this one.
+import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, adminResetOrganizerPin, deleteEventOwn } from '../api.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -104,10 +104,11 @@ export function renderAdmin(){
       }
       events.forEach(ev=>{
         html += `<div class="contestant-item" style="cursor:default;">
-          <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.slug ? escapeHtml(ev.slug) : '(no slug set)'} &middot; ${ev.active ? 'active' : 'inactive'}</span></div>
+          <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.slug ? escapeHtml(ev.slug) : '(no slug set)'} &middot; ${ev.active ? 'active' : 'inactive'} &middot; Organizer PIN: <b data-organizer-pin-for="${escapeAttr(ev.id)}">${escapeHtml(ev.organizerPin || '?')}</b></span></div>
           <span style="display:flex; gap:6px;">
             <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'judge'))}">Judge link</button>
             <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'organizer'))}">Organizer link</button>
+            <button class="btn btn-outline btn-small" data-reset-organizer-pin="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Reset PIN</button>
             <button class="btn-danger-quiet" data-remove-event="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Remove</button>
           </span>
         </div>`;
@@ -220,6 +221,32 @@ export function attachAdminHandlers(){
         alert('Could not remove event — check connection.');
         btn.disabled = false;
         btn.textContent = 'Remove';
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-reset-organizer-pin]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const eventId = btn.getAttribute('data-reset-organizer-pin');
+      const eventName = btn.getAttribute('data-event-name');
+      if(!confirm(`Reset the organizer PIN for "${eventName}"? The current PIN will stop working immediately -- tell the organizer the new one.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Resetting…';
+      try{
+        const { pin } = await adminResetOrganizerPin(state.adminToken, eventId);
+        const ev = state.adminEvents.find(e=>e.id===eventId);
+        if(ev) ev.organizerPin = pin;
+        const pinEl = document.querySelector(`[data-organizer-pin-for="${eventId}"]`);
+        if(pinEl) pinEl.textContent = pin;
+        showToast(`New organizer PIN for "${eventName}": ${pin}`);
+        btn.disabled = false;
+        btn.textContent = 'Reset PIN';
+      }catch(e){
+        if(handleAdminAuthError(e)) return;
+        console.error('reset organizer pin failed', e);
+        alert('Could not reset PIN — check connection.');
+        btn.disabled = false;
+        btn.textContent = 'Reset PIN';
       }
     };
   });
