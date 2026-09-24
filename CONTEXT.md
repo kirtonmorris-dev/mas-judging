@@ -705,6 +705,11 @@ gate itself didn't distinguish clients.
   anon RPC call (no proxy), and the reset endpoint reuses the
   `ADMIN_TOKEN_SECRET`/`SUPABASE_SERVICE_ROLE_KEY` already set for the
   admin-auth fix above.
+- **Merged to `main`, deployed, and verified live on `judgedshow.com/app`**
+  2026-09-24: an existing event's old shared PIN (`2026`) still unlocks its
+  Organizer tab, and a newly-created event gets a distinct random PIN that
+  the old shared PIN does not unlock. Both confirmed directly by Kirt in
+  production, not just on a preview deploy.
 - **Known, accepted limitation, not fixed here**: `check_event_organizer_pin`
   has no rate limiting or lockout — a script could brute-force a 4-digit PIN
   against a known event id in well under a minute. Same risk class as the
