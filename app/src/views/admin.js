@@ -6,10 +6,10 @@
 // adminCreateEvent, all separate RPCs from the event-scoped ones those
 // views use) -- so there is no flag anywhere that widens a normal
 // session's access into this one.
-import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, deleteEventOwn } from '../api.js';
-import { ADMIN_PIN } from '../constants.js';
+import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, deleteEventOwn } from '../api.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
+import { showToast } from '../ui.js';
 import { escapeAttr, escapeHtml } from '../utils.js';
 
 function linkFor(ev, mode){
@@ -33,12 +33,51 @@ export function renderAdminGate(){
   </div>`;
 }
 
+// The PIN is checked server-side now (api/admin/auth.js, against the
+// ADMIN_PIN Vercel env var) -- this just relays the entered PIN and stores
+// the short-lived token it gets back. See api.js's adminLogin.
 export function attachAdminGateHandlers(){
-  document.getElementById('adminPinSubmit').onclick = ()=>{
+  const submitBtn = document.getElementById('adminPinSubmit');
+  submitBtn.onclick = async ()=>{
     const val = document.getElementById('adminPinInput').value.trim();
-    if(val === ADMIN_PIN){ state.adminUnlocked = true; render(); }
-    else { document.getElementById('adminPinErr').style.display='block'; }
+    const errEl = document.getElementById('adminPinErr');
+    errEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Checking…';
+    try{
+      const token = await adminLogin(val);
+      if(token){
+        state.adminToken = token;
+        state.adminUnlocked = true;
+        render();
+      } else {
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Unlock';
+      }
+    }catch(e){
+      console.error('admin login failed', e);
+      errEl.textContent = 'Could not reach the server — check connection.';
+      errEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Unlock';
+    }
   };
+}
+
+// Any admin call gets here on a 401 (token expired or was never valid) --
+// drop back to the PIN gate rather than leaving the UI in a broken state.
+function handleAdminAuthError(e){
+  if(e && e.code === 'admin_unauthorized'){
+    state.adminUnlocked = false;
+    state.adminToken = null;
+    state.adminClients = null;
+    state.adminEvents = null;
+    showToast('Admin session expired — enter the PIN again', true);
+    render();
+    return true;
+  }
+  return false;
 }
 
 export function renderAdmin(){
@@ -100,10 +139,11 @@ export function renderAdmin(){
 
 export async function loadAdminData(){
   try{
-    const [clients, events] = await Promise.all([adminListClients(), adminListEvents()]);
+    const [clients, events] = await Promise.all([adminListClients(state.adminToken), adminListEvents(state.adminToken)]);
     state.adminClients = clients;
     state.adminEvents = events;
   }catch(e){
+    if(handleAdminAuthError(e)) return;
     console.error('admin data load failed', e);
     state.adminClients = [];
     state.adminEvents = [];
@@ -143,8 +183,8 @@ export function attachAdminHandlers(){
     createClientBtn.disabled = true;
     createClientBtn.textContent = 'Adding…';
     try{
-      const newClientId = await adminCreateClient(name);
-      const clients = await adminListClients();
+      const newClientId = await adminCreateClient(state.adminToken, name);
+      const clients = await adminListClients(state.adminToken);
       state.adminClients = clients;
       const sel = document.getElementById('adminNewEventClient');
       sel.innerHTML = '<option value="">Select client&hellip;</option>'
@@ -156,6 +196,7 @@ export function attachAdminHandlers(){
       createClientBtn.disabled = false;
       createClientBtn.textContent = 'Add client';
     }catch(e){
+      if(handleAdminAuthError(e)) return;
       console.error('create client failed', e);
       errEl.textContent = 'Could not add client — check connection.';
       errEl.style.display = 'block';
@@ -191,9 +232,10 @@ export function attachAdminHandlers(){
       btn.disabled = true;
       btn.textContent = 'Removing…';
       try{
-        await adminDeleteClient(clientId);
+        await adminDeleteClient(state.adminToken, clientId);
         await loadAdminData();
       }catch(e){
+        if(handleAdminAuthError(e)) return;
         console.error('remove client failed', e);
         alert(e && e.code === 'client_has_events'
           ? 'This client still has events — remove those first.'
@@ -227,9 +269,10 @@ export function attachAdminHandlers(){
     createBtn.disabled = true;
     createBtn.textContent = 'Creating…';
     try{
-      await adminCreateEvent(clientId, name, slug);
+      await adminCreateEvent(state.adminToken, clientId, name, slug);
       await loadAdminData();
     }catch(e){
+      if(handleAdminAuthError(e)) return;
       console.error('create event failed', e);
       errEl.textContent = e && e.code === 'slug_taken'
         ? 'That link slug is already used by another event — pick a different one.'

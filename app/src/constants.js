@@ -13,10 +13,11 @@ export const CRITERIA_TEMPLATE = [
 
 export const ORG_PIN = '2026';
 
-// Gate for the admin view (/app?admin=1) -- the ONLY place that can see across
-// clients/events, list them, or create a new event. Change this before sharing
-// any link publicly; it is not a secret-strength value as shipped.
-export const ADMIN_PIN = '738104';
+// The admin PIN is no longer a client-side constant -- it moved to the
+// ADMIN_PIN server env var, checked only in api/admin/auth.js. That's what
+// actually gates the admin RPCs now (their anon EXECUTE grant was revoked;
+// see the lock_down_admin_rpcs migration), not this file. See
+// views/admin.js's attachAdminGateHandlers / api.js's adminLogin.
 
 export function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
 
