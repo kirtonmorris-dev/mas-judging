@@ -718,6 +718,36 @@ gate itself didn't distinguish clients.
   whose organizer PIN protects something more sensitive than tally
   visibility, but not done as part of this fix — flagged, not solved.
 
+## Score history audit log now awaited, not fire-and-forget (2026-09-27)
+
+**The problem this fixed**: `api.js`'s `saveScoreEntry`, `saveScoresMerge`,
+and `saveOrganizerScoreEdit` all await `upsertScoreRows` (the `scores` table
+write), so the live tally and Judge Detail totals were always correct. But
+each of them fired `logScoreHistory(...)` unawaited
+(`.catch(e=>console.error(...))` and nothing else) — a fire-and-forget
+write to the `score_history` audit table with no retry and no user-facing
+failure signal. If that request failed or got cut off (a network hiccup, a
+tab closing or navigating right after submit), the audit trail silently
+lost that entry, with `console.error` the only trace and nobody watching
+it. Net effect: a judge's resubmitted score could show the correct current
+total in Judge Detail and Live Tally, but the "View edit history" panel
+(`views/tally.js`) would be missing that submission's row.
+
+**What changed**: added a small `logScoreHistoryOrToast(rows)` helper in
+`api.js` that all three functions now `await` in place of the old
+fire-and-forget call. It still never fails the caller — the score itself is
+already saved by the time it runs — but on failure it now calls
+`showToast('Edit history backup failed', true, retryFn)`, matching the
+existing save-failure toast pattern used elsewhere in these same functions,
+with the retry button re-running the same `logScoreHistory` call. The
+`scores` table logic (`upsertScoreRows`, `deleteScoreRows`) was not touched.
+
+**Merged to `main` and deployed** 2026-09-27, after verifying on a Vercel
+preview deploy (`fix/await-score-history-log` branch): submitted a score as
+a judge, resubmitted it with a different value, and confirmed Live Tally's
+"View edit history" for that category showed both the original and the
+resubmitted entry. Confirmed directly by Kirt on the preview before merge.
+
 ## Things intentionally NOT built (don't assume otherwise)
 
 - No account system beyond judge PIN + organizer PIN + admin PIN.
