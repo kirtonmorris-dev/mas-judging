@@ -252,9 +252,15 @@
   .tally-card-total{ font-family:'Fraunces', serif; font-weight:900; font-style:italic; font-size:2.1rem; color:var(--cream); font-variant-numeric:tabular-nums; line-height:1; }
   .tally-card-status{ color:var(--on-navy-soft); font-size:0.76rem; margin-top:8px; }
   @media print{
-    body *{ visibility:hidden; }
-    #printArea, #printArea *{ visibility:visible; }
-    #printArea{ position:absolute; top:0; left:0; width:100%; display:block !important; }
+    /* display:none (not visibility:hidden) on every other direct body child --
+       visibility:hidden keeps its layout box, and that hidden-but-still-flowed
+       content (the Organizer/Tally view underneath, which can be tall) was
+       what determined the printed page count, producing a real second
+       (visually blank, since nothing painted there) page after #printArea's
+       own content. display:none removes it from flow entirely, so pagination
+       is driven only by #printArea's actual content. */
+    body > *:not(#printArea){ display:none !important; }
+    #printArea{ display:block !important; }
     .print-page{ page-break-after: always; }
     .print-page:last-child{ page-break-after: auto; }
   }
