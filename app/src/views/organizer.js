@@ -5,7 +5,7 @@ import { render } from '../main.js';
 import { printAllSignoffSheets, printBlankSheets, printSignoffSheet } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, uid } from '../utils.js';
+import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, setTallyView, uid } from '../utils.js';
 import { renderJudgeDetail } from '../views/judgeDetail.js';
 import { attachCategoryCardHandlers, attachCompetitionSettingsHandlers, renderCategoryCards, renderSetup } from '../views/setup.js';
 import { renderEventPicker } from '../views/shared.js';
@@ -96,6 +96,9 @@ export function attachOrganizerHandlers(){
   });
 
   if(state.orgTab==='tally'){
+    document.querySelectorAll('[data-tally-view]').forEach(el=>{
+      el.onclick = ()=>{ setTallyView(el.getAttribute('data-tally-view')); render(); };
+    });
     const sel = document.getElementById('tallyCategorySelect');
     if(sel) sel.onchange = (e)=>{ state.categoryId = e.target.value; state.tallyStageFilter=''; state.historyPanelCategoryId=null; render(); };
     const stageSel = document.getElementById('tallyStageSelect');
@@ -103,15 +106,15 @@ export function attachOrganizerHandlers(){
     const ev = currentEvent();
     if(ev){
       const printSignoffBtn = document.getElementById('printSignoffBtn');
-      if(printSignoffBtn) printSignoffBtn.onclick = ()=>{
+      if(printSignoffBtn) printSignoffBtn.onclick = async ()=>{
         const catId = state.categoryId || (ev.categories[0] && ev.categories[0].id);
         const cat = ev.categories.find(c=>c.id===catId);
         if(!cat){ showToast('No category selected', true); return; }
-        printSignoffSheet(ev, cat);
+        await printSignoffSheet(ev, cat);
         render();
       };
       const printAllSignoffBtn = document.getElementById('printAllSignoffBtn');
-      if(printAllSignoffBtn) printAllSignoffBtn.onclick = ()=>{ printAllSignoffSheets(ev); render(); };
+      if(printAllSignoffBtn) printAllSignoffBtn.onclick = async ()=>{ await printAllSignoffSheets(ev); render(); };
 
       if(!state.organizerEditSummary[ev.id]){
         fetchOrganizerEditSummary(ev.id).then(summary=>{

@@ -25,11 +25,6 @@ export function showToast(msg, isErr, actionFn, actionLabel){
   t._hideTimer = setTimeout(()=>t.classList.remove('show'), duration);
 }
 
-export function renderPennants(){
-  const el = document.getElementById('pennants');
-  el.innerHTML = Array.from({length:14}).map(()=>'<span></span>').join('');
-}
-
 // Proactive offline warning -- shows a banner and toast the moment the
 // connection drops, rather than only finding out via a failed save.
 export function initConnectionBanner(){

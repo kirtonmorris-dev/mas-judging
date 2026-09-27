@@ -1,7 +1,7 @@
 import { SUPABASE_KEY, SUPABASE_URL, normalizeConfig } from './constants.js';
 import { render } from './main.js';
 import { state } from './state.js';
-import { renderPennants, showToast } from './ui.js';
+import { showToast } from './ui.js';
 
 const REST = `${SUPABASE_URL}/rest/v1`;
 const AUTH_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
@@ -228,7 +228,6 @@ export async function loadAll(){
 
   document.getElementById('loadingMsg').style.display='none';
   document.getElementById('app').style.display='block';
-  renderPennants();
   render();
 }
 

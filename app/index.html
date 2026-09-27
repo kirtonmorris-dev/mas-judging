@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Judge D Show — Live Scoring for Every Competition</title>
+<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -16,10 +20,9 @@
 </head>
 <body>
 
-<div class="pennants" id="pennants"></div>
 <div id="connBanner" class="conn-banner" style="display:none;">You're offline &mdash; scores won't save until you reconnect.</div>
-<header>
-  <h1 class="display">Judge D Show</h1>
+<header class="header-band">
+  <h1 class="display header-lockup"><svg class="d-badge on-navy" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle class="d-badge-bg" cx="50" cy="50" r="50"/><path class="d-badge-glyph" d="M20.92 76.23Q20.92 76.08 21.03 75.99Q21.15 75.89 21.41 75.86L24.40 75.44Q24.89 75.36 25.21 75.14Q25.54 74.91 25.74 74.51Q25.95 74.11 26.07 73.62Q26.37 72.53 27.16 69.57Q27.96 66.62 29.08 62.49Q30.19 58.37 31.46 53.69Q32.73 49.02 33.96 44.42Q35.19 39.82 36.23 35.94Q37.27 32.06 37.93 29.52Q38.60 26.98 38.71 26.49Q38.90 25.54 38.64 25.11Q38.37 24.67 37.50 24.56L34.70 24.18Q34.40 24.14 34.30 24.05Q34.21 23.95 34.21 23.80Q34.21 23.65 34.34 23.58Q34.47 23.50 34.74 23.50H59.46Q64.57 23.50 68.64 25.18Q72.71 26.87 75.34 30.24Q77.97 33.61 78.78 38.66Q79.60 43.72 78.20 50.49Q76.98 56.44 74.28 61.22Q71.57 66.01 67.46 69.42Q63.36 72.83 57.89 74.66Q52.42 76.50 45.68 76.50H21.37Q21.15 76.50 21.03 76.44Q20.92 76.39 20.92 76.23ZM46.36 75.59Q48.14 75.59 50.11 74.34Q52.07 73.09 54.10 70.18Q56.13 67.26 58.07 62.23Q60.02 57.19 61.73 49.66Q63.28 42.88 63.73 38.07Q64.19 33.27 63.73 30.24Q63.28 27.21 62.05 25.81Q60.82 24.41 58.96 24.41H58.47Q56.84 24.41 55.54 25.62Q54.23 26.83 53.51 29.41Q53.29 30.24 52.64 32.64Q52.00 35.05 51.09 38.49Q50.18 41.94 49.16 45.85Q48.14 49.77 47.12 53.69Q46.09 57.61 45.22 60.96Q44.35 64.31 43.76 66.60Q43.18 68.89 43.03 69.53Q42.27 72.60 42.86 74.10Q43.44 75.59 45.49 75.59Z"/></svg><span>Judge D Show</span></h1>
   <p>Live Scoring for Every Competition</p>
 </header>
 
@@ -37,8 +40,8 @@
 
 <div id="printArea" class="print-only"></div>
 
-<footer style="text-align:center; padding:24px 16px 40px; color:rgba(20,24,31,0.55); font-size:0.72rem; letter-spacing:0.02em;">
-  &copy; 2026 <a href="https://www.immortelleadvisorygroup.com/" target="_blank" rel="noopener" style="color:rgba(20,24,31,0.55); text-decoration:underline;">Immortelle Advisory Group</a>. Built by Kirt Morris, Founder &amp; Principal Consultant.
+<footer style="text-align:center; padding:24px 16px 40px; color:var(--ink-soft); font-size:0.72rem; letter-spacing:0.02em;">
+  &copy; 2026 <a href="https://www.immortelleadvisorygroup.com/" target="_blank" rel="noopener" style="color:var(--ink-soft); text-decoration:underline;">Immortelle Advisory Group</a>. Built by Kirt Morris, Founder &amp; Principal Consultant.
 </footer>
 
 <script type="module" src="/app/src/main.js"></script>

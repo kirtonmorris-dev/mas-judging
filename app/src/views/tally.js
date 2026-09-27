@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { contestantSubtitle, contestantTitle, escapeHtml, getLastPrintedAt, scoreKey, shortJudgeLabel } from '../utils.js';
+import { contestantSubtitle, contestantTitle, escapeHtml, getLastPrintedAt, getTallyView, rankContestants, shortJudgeLabel } from '../utils.js';
 
 export function renderTally(ev){
   if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one below.</div>';
@@ -31,7 +31,7 @@ export function renderTally(ev){
       <button class="btn btn-outline-light btn-small" id="printSignoffBtn">Print for signatures</button>
       <button class="btn btn-outline-light btn-small" id="printAllSignoffBtn">Print all categories</button>
       <button class="btn btn-outline-light btn-small" data-view-history="${escapeHtml(catId)}">View edit history</button>
-      ${editedSincePrint ? '<span style="color:#b8860b; font-weight:700; font-size:0.82rem;">&#9888; Edited by organizer since sign-off was last printed</span>' : ''}
+      ${editedSincePrint ? '<span style="color:var(--pending); font-weight:700; font-size:0.82rem;">&#9888; Edited by organizer since sign-off was last printed</span>' : ''}
     </div>`;
 
   if(state.historyPanelCategoryId === catId){
@@ -43,30 +43,22 @@ export function renderTally(ev){
     : cat.contestants;
 
   const catJudges = ev.judges.filter(j => visibleContestants.some(ct => ct.assignedJudges.includes(j.name)));
-
-  const rows = visibleContestants.map(ct=>{
-    const perJudge = catJudges.map(j=>{
-      if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
-      const key = scoreKey(ev.id, cat.id, ct.id, j.name);
-      const s = state.scores[key];
-      if(!s) return {status:'pending'};
-      return {status:'scored', value: cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0)};
-    });
-    const submitted = perJudge.filter(p=>p.status==='scored').map(p=>p.value);
-    const total = submitted.length ? submitted.reduce((a,b)=>a+b,0) : null;
-    return { contestant: ct, perJudge, total };
-  });
-
-  rows.sort((a,b)=>{
-    if(a.total===null && b.total===null) return 0;
-    if(a.total===null) return 1;
-    if(b.total===null) return -1;
-    return b.total - a.total;
-  });
+  const rows = rankContestants(ev, cat, visibleContestants, catJudges);
 
   html += `<div class="status-line">${catJudges.length} of ${ev.judges.length} judge${ev.judges.length!==1?'s':''} assigned to this category &middot; columns marked &middot; mean not assigned to that contestant</div>`;
 
-  html += '<div class="card"><table><thead><tr><th style="width:26px;">Pos.</th><th>Entry</th>';
+  const view = getTallyView();
+  html += `<div class="tally-view-toggle">
+      <button data-tally-view="table" class="${view==='table'?'active':''}">Table</button>
+      <button data-tally-view="cards" class="${view==='cards'?'active':''}">Cards</button>
+    </div>`;
+
+  html += view === 'cards' ? renderTallyCards(cat, rows) : renderTallyTable(cat, catJudges, rows);
+  return html;
+}
+
+function renderTallyTable(cat, catJudges, rows){
+  let html = '<div class="card"><table><thead><tr><th style="width:26px;">Pos.</th><th>Entry</th>';
   catJudges.forEach(j=>{ html += `<th style="width:32px;">${escapeHtml(shortJudgeLabel(j.name))}</th>`; });
   html += '<th style="width:42px;">Total</th></tr></thead><tbody>';
   rows.forEach((r,i)=>{
@@ -82,6 +74,26 @@ export function renderTally(ev){
     html += `<td class="num">${r.total===null?'&mdash;':r.total}</td></tr>`;
   });
   html += '</tbody></table></div>';
+  return html;
+}
+
+function renderTallyCards(cat, rows){
+  let html = '<div class="tally-card-grid">';
+  rows.forEach((r,i)=>{
+    const place = r.total!==null ? (i+1) : '—';
+    const submittedCount = r.perJudge.filter(p=>p.status==='scored').length;
+    const totalAssigned = r.perJudge.filter(p=>p.status!=='na').length;
+    const isRank1 = i===0 && r.total!==null;
+    html += `<div class="tally-card${isRank1?' rank1':''}">
+        <div class="tally-card-top">
+          <span class="tally-card-place-name">${place}. ${escapeHtml(contestantTitle(cat,r.contestant))}</span>
+        </div>
+        <div class="tally-card-subtitle">${escapeHtml(contestantSubtitle(cat,r.contestant))}</div>
+        <div class="tally-card-total">${r.total===null?'—':r.total}</div>
+        <div class="tally-card-status">${submittedCount} of ${totalAssigned} judge${totalAssigned!==1?'s':''} submitted</div>
+      </div>`;
+  });
+  html += '</div>';
   return html;
 }
 

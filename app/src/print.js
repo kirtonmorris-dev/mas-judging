@@ -1,15 +1,53 @@
 import { state } from './state.js';
 import { showToast } from './ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, scoreKey, setLastPrintedAt } from './utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, formatEventDateRange, rankContestants, scoreKey, setLastPrintedAt } from './utils.js';
+
+// Shared black-and-white chrome for all three printouts -- blank scoring
+// sheets, a judge's own scoring record, and the sign-off sheet. Pure
+// black-on-white, no color, no grey fills (see CONTEXT.md's print section).
+function buildPrintHeader(ev, docTitle){
+  const dateRange = formatEventDateRange(ev.eventDateStart, ev.eventDateEnd);
+  return `
+    <div class="print-header-row">
+      <div class="print-header-wordmark">Judge D Show</div>
+      <div class="print-doctype">${escapeHtml(docTitle)}</div>
+    </div>
+    <div class="print-meta-row">
+      <div class="print-meta-field"><span class="print-meta-label">Event</span><span class="print-meta-value">${escapeHtml(ev.name)}</span></div>
+      <div class="print-meta-field"><span class="print-meta-label">Date</span><span class="print-meta-value">${dateRange ? escapeHtml(dateRange) : '&nbsp;'}</span></div>
+      <div class="print-meta-field"><span class="print-meta-label">Venue</span><span class="print-meta-value">${ev.venue ? escapeHtml(ev.venue) : '&nbsp;'}</span></div>
+    </div>`;
+}
+
+function buildPrintSubrow(catName, judgeName){
+  const parts = [`<span class="print-meta-field"><span class="print-meta-label">Category</span><span class="print-meta-value">${escapeHtml(catName)}</span></span>`];
+  if(judgeName) parts.push(`<span class="print-meta-field"><span class="print-meta-label">Judge</span><span class="print-meta-value">${escapeHtml(judgeName)}</span></span>`);
+  return `<div class="print-meta-row print-meta-subrow">${parts.join('')}</div>`;
+}
+
+function buildPrintFooter(){
+  return `<div class="print-footer">
+      <span class="print-footer-copyright">&copy; 2026 Immortelle Advisory Group</span>
+      <span class="print-footer-wordmark">Judge D Show</span>
+    </div>`;
+}
+
+// Score numbers only load correctly once the webfonts are actually ready --
+// otherwise Fraunces 900 italic can still be swapping in mid-print.
+async function printWhenFontsReady(){
+  if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  window.print();
+}
 
 export function buildBlankSheetPageHtml(ev, cat, judgeName){
   const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
   if(contestants.length===0) return '';
   let html = `<div class="print-page">`;
-  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Blank Scoring Sheet</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
-  html += `<div class="print-meta">Judge: <b>${escapeHtml(judgeName)}</b> &nbsp;&nbsp; Date: <span class="print-blank-line" style="width:120px;"></span></div>`;
+  html += `<div class="print-body">`;
+  html += buildPrintHeader(ev, 'Blank Scoring Sheet');
+  html += buildPrintSubrow(cat.name, judgeName);
   contestants.forEach(ct=>{
-    html += `<div style="margin-bottom:18px; border:1px solid #333; padding:10px;">`;
+    html += `<div style="margin-bottom:18px; border:1px solid #000; padding:10px;">`;
     html += `<div style="font-weight:700; margin-bottom:6px;">${escapeHtml(contestantTitle(cat,ct))}</div>`;
     const sub = contestantSubtitle(cat,ct);
     if(sub) html += `<div style="font-size:0.85rem; margin-bottom:8px;">${escapeHtml(sub)}</div>`;
@@ -20,10 +58,12 @@ export function buildBlankSheetPageHtml(ev, cat, judgeName){
     html += `</div>`;
   });
   html += `</div>`;
+  html += buildPrintFooter();
+  html += `</div>`;
   return html;
 }
 
-export function printBlankSheets(ev){
+export async function printBlankSheets(ev){
   let pages = '';
   ev.judges.forEach(j=>{
     ev.categories.forEach(cat=>{
@@ -32,18 +72,19 @@ export function printBlankSheets(ev){
   });
   if(!pages){ showToast('No judges assigned to any contestants yet', true); return; }
   document.getElementById('printArea').innerHTML = pages;
-  window.print();
+  await printWhenFontsReady();
 }
 
 export function buildJudgeScoresPageHtml(ev, cat, judgeName){
   const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
   let html = `<div class="print-page">`;
-  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Judge Scoring Record</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
-  html += `<div class="print-meta">Judge: <b>${escapeHtml(judgeName)}</b> &nbsp;&nbsp; Printed: ${new Date().toLocaleString()}</div>`;
+  html += `<div class="print-body">`;
+  html += buildPrintHeader(ev, 'Judge Scoring Record');
+  html += buildPrintSubrow(cat.name, judgeName);
   contestants.forEach(ct=>{
     const key = scoreKey(ev.id, cat.id, ct.id, judgeName);
     const s = state.scores[key];
-    html += `<div style="margin-bottom:18px; border:1px solid #333; padding:10px;">`;
+    html += `<div style="margin-bottom:18px; border:1px solid #000; padding:10px;">`;
     html += `<div style="font-weight:700; margin-bottom:6px;">${escapeHtml(contestantTitle(cat,ct))}</div>`;
     const sub = contestantSubtitle(cat,ct);
     if(sub) html += `<div style="font-size:0.85rem; margin-bottom:8px;">${escapeHtml(sub)}</div>`;
@@ -62,69 +103,68 @@ export function buildJudgeScoresPageHtml(ev, cat, judgeName){
     html += `</div>`;
   });
   html += `</div>`;
+  html += buildPrintFooter();
+  html += `</div>`;
   return html;
 }
 
-export function printMyScores(ev, cat, judgeName){
+export async function printMyScores(ev, cat, judgeName){
   document.getElementById('printArea').innerHTML = buildJudgeScoresPageHtml(ev, cat, judgeName);
-  window.print();
+  await printWhenFontsReady();
 }
 
 export function buildSignoffPageHtml(ev, cat){
-  const rows = cat.contestants.map(ct=>{
-    const perJudge = ev.judges.map(j=>{
-      if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
-      const key = scoreKey(ev.id, cat.id, ct.id, j.name);
-      const s = state.scores[key];
-      if(!s) return {status:'pending'};
-      return {status:'scored', value: cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0)};
-    });
-    const submitted = perJudge.filter(p=>p.status==='scored').map(p=>p.value);
-    const total = submitted.length ? submitted.reduce((a,b)=>a+b,0) : null;
-    return { contestant: ct, perJudge, total };
-  });
-  rows.sort((a,b)=>{
-    if(a.total===null && b.total===null) return 0;
-    if(a.total===null) return 1;
-    if(b.total===null) return -1;
-    return b.total - a.total;
-  });
+  const rows = rankContestants(ev, cat, cat.contestants, ev.judges);
 
   let html = `<div class="print-page">`;
-  html += `<div class="print-header"><h1>${escapeHtml(ev.name)}</h1><h2>Final Tally Sheet</h2><h3>${escapeHtml(cat.name)}</h3></div>`;
+  html += `<div class="print-body">`;
+  html += buildPrintHeader(ev, 'Official Sign-off Sheet');
+  html += buildPrintSubrow(cat.name);
   html += `<table class="print-table"><thead><tr><th>Place</th><th>Entry</th>`;
-  ev.judges.forEach(j=>{ html += `<th>${escapeHtml(j.name)}</th>`; });
-  html += `<th>Total</th></tr></thead><tbody>`;
+  ev.judges.forEach(j=>{ html += `<th class="print-num">${escapeHtml(j.name)}</th>`; });
+  html += `<th class="print-num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{
-    const place = r.total!==null ? (i+1) : '\u2014';
+    const place = r.total!==null ? (i+1) : '—';
     const sub = contestantSubtitle(cat,r.contestant);
-    html += `<tr><td>${place}</td><td>${escapeHtml(contestantTitle(cat,r.contestant))}${sub?' \u2014 '+escapeHtml(sub):''}</td>`;
+    html += `<tr><td>${place}</td><td>${escapeHtml(contestantTitle(cat,r.contestant))}${sub?' — '+escapeHtml(sub):''}</td>`;
     r.perJudge.forEach(p=>{
-      if(p.status==='na') html += `<td>\u00b7</td>`;
-      else if(p.status==='pending') html += `<td>\u2014</td>`;
-      else html += `<td>${p.value}</td>`;
+      if(p.status==='na') html += `<td class="print-num">·</td>`;
+      else if(p.status==='pending') html += `<td class="print-num">—</td>`;
+      else html += `<td class="print-num">${p.value}</td>`;
     });
-    html += `<td><b>${r.total===null?'\u2014':r.total}</b></td></tr>`;
+    html += `<td class="print-num"><b>${r.total===null?'—':r.total}</b></td></tr>`;
   });
   html += `</tbody></table>`;
+
   html += `<div class="print-signatures">`;
+  html += `<div class="print-sig-grid">`;
   ev.judges.forEach(j=>{
-    html += `<div class="sig-line"><span>${escapeHtml(j.name)} \u2014 Signature</span><div class="sig-blank"></div></div>`;
+    html += `<div class="sig-line"><div class="sig-blank"></div><span>${escapeHtml(j.name)} — Signature</span></div>`;
   });
-  html += `<div class="sig-line"><span>Judges Coordinator \u2014 Signature</span><div class="sig-blank"></div></div>`;
+  html += `</div>`;
+  html += `<div class="print-cert-block">`;
+  html += `<div class="print-cert-sentence">I certify the scores recorded above are accurate and final as tallied by Judge D Show.</div>`;
+  html += `<div class="print-cert-row">`;
+  html += `<div class="sig-line"><div class="sig-blank"></div><span>Head Judge Signature</span></div>`;
+  html += `<div class="sig-line"><div class="sig-blank"></div><span>Organizer Signature</span></div>`;
+  html += `<div class="sig-line print-cert-date"><div class="sig-blank"></div><span>Date</span></div>`;
   html += `</div></div>`;
+  html += `</div>`;
+  html += `</div>`;
+  html += buildPrintFooter();
+  html += `</div>`;
   return html;
 }
 
-export function printSignoffSheet(ev, cat){
+export async function printSignoffSheet(ev, cat){
   document.getElementById('printArea').innerHTML = buildSignoffPageHtml(ev, cat);
-  window.print();
+  await printWhenFontsReady();
   setLastPrintedAt(ev.id, cat.id);
 }
 
-export function printAllSignoffSheets(ev){
+export async function printAllSignoffSheets(ev){
   if(ev.categories.length===0){ showToast('No categories to print', true); return; }
   document.getElementById('printArea').innerHTML = ev.categories.map(c=>buildSignoffPageHtml(ev,c)).join('');
-  window.print();
+  await printWhenFontsReady();
   ev.categories.forEach(c=>setLastPrintedAt(ev.id, c.id));
 }

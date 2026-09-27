@@ -55,6 +55,20 @@ export function draftHasUnsavedWork(key, cat){
   });
 }
 
+// "Aug 30, 2026" for a single date, "Aug 30 – Sep 1, 2026" for a range
+// (same month) or "Aug 30 – Sep 2, 2026" across months -- always ends in
+// one year, never repeated for same-year ranges.
+export function formatEventDateRange(startStr, endStr){
+  if(!startStr) return '';
+  const start = new Date(startStr + 'T00:00:00');
+  if(isNaN(start)) return '';
+  const monthDay = (d)=>d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  if(!endStr || endStr === startStr) return `${monthDay(start)}, ${start.getFullYear()}`;
+  const end = new Date(endStr + 'T00:00:00');
+  if(isNaN(end)) return `${monthDay(start)}, ${start.getFullYear()}`;
+  return `${monthDay(start)} – ${monthDay(end)}, ${end.getFullYear()}`;
+}
+
 export function shortJudgeLabel(name){
   const m = /^Judge\s+(\d+)$/i.exec((name||'').trim());
   return m ? ('J'+m[1]) : name;
@@ -86,4 +100,44 @@ export function setLastPrintedAt(eventId, categoryId){
     map[eventId + '|' + categoryId] = Date.now();
     localStorage.setItem(LAST_PRINTED_KEY, JSON.stringify(map));
   }catch(e){ /* localStorage unavailable -- indicator just won't show, no functional impact */ }
+}
+
+// Live Tally's Table/Cards toggle, remembered per browser -- same
+// try/catch-wrapped localStorage pattern as getLastPrintedAt/setLastPrintedAt
+// above, since it's a per-viewer convenience, not authoritative state.
+const TALLY_VIEW_KEY = 'jds_tally_view';
+
+export function getTallyView(){
+  try{ return localStorage.getItem(TALLY_VIEW_KEY) === 'cards' ? 'cards' : 'table'; }
+  catch(e){ return 'table'; }
+}
+
+export function setTallyView(view){
+  try{ localStorage.setItem(TALLY_VIEW_KEY, view); }
+  catch(e){ /* localStorage unavailable -- toggle just won't persist, no functional impact */ }
+}
+
+// Shared ranking math for Live Tally's table and card views (and the
+// sign-off print sheet) -- one place computing per-judge status/value and
+// each contestant's total, so the two renderers never compute it twice.
+export function rankContestants(ev, cat, contestants, judges){
+  const rows = contestants.map(ct=>{
+    const perJudge = judges.map(j=>{
+      if(!ct.assignedJudges.includes(j.name)) return {status:'na'};
+      const key = scoreKey(ev.id, cat.id, ct.id, j.name);
+      const s = state.scores[key];
+      if(!s) return {status:'pending'};
+      return {status:'scored', value: cat.criteria.reduce((sum,c)=>sum+(s[c.key]||0),0)};
+    });
+    const submitted = perJudge.filter(p=>p.status==='scored').map(p=>p.value);
+    const total = submitted.length ? submitted.reduce((a,b)=>a+b,0) : null;
+    return { contestant: ct, perJudge, total };
+  });
+  rows.sort((a,b)=>{
+    if(a.total===null && b.total===null) return 0;
+    if(a.total===null) return 1;
+    if(b.total===null) return -1;
+    return b.total - a.total;
+  });
+  return rows;
 }
