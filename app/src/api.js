@@ -150,6 +150,18 @@ async function logScoreHistory(rows){
   });
 }
 
+// The score save itself already succeeded by the time this runs, so a
+// failure here must never fail the caller -- it only needs to be visible
+// and retryable instead of silently going to console.error.
+async function logScoreHistoryOrToast(rows){
+  try{
+    await logScoreHistory(rows);
+  }catch(e){
+    console.error('history backup failed', e);
+    showToast('Edit history backup failed', true, ()=>logScoreHistoryOrToast(rows));
+  }
+}
+
 // Lightweight per-category summary of the latest organizer-made correction,
 // used only to decide whether to show an "edited since printed" badge --
 // not the full change detail (see fetchScoreHistoryForCategory for that).
@@ -262,7 +274,7 @@ export async function saveScoresMerge(mutateFn){
     await deleteScoreRows(deleteKeys);
 
     state.scores = latest;
-    logScoreHistory(upsertRows).catch(e=>console.error('history backup failed', e));
+    await logScoreHistoryOrToast(upsertRows);
     return true;
   }catch(e){
     console.error('saveScoresMerge failed', e);
@@ -280,7 +292,7 @@ export async function saveScoreEntry(key, entry){
     const row = scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, entry);
     await upsertScoreRows([row]);
     state.scores[key] = entry;
-    logScoreHistory([row]).catch(e=>console.error('history backup failed', e));
+    await logScoreHistoryOrToast([row]);
     return true;
   }catch(e){
     console.error('saveScoreEntry failed', e);
@@ -327,7 +339,7 @@ export async function saveOrganizerScoreEdit(key){
     const row = scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, updated);
     await upsertScoreRows([row]);
     state.scores[key] = updated;
-    logScoreHistory([row]).catch(e=>console.error('history backup failed', e));
+    await logScoreHistoryOrToast([row]);
     return true;
   }catch(e){
     console.error('saveOrganizerScoreEdit failed', e);
