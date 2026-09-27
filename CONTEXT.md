@@ -860,11 +860,27 @@ Signature" line (same person, new title, never both printed). An
 Organizer Signature line was tried in the same certification block and
 then removed the same day at Kirt's request — Head Judge + Date only.
 `.print-page` briefly had `display:flex; flex-direction:column;
-min-height:100vh` to pin the footer to the page bottom; this produced a
-spurious blank second page in real print output (a known risk with
-`100vh` in print contexts, without `@page` sizing to anchor it) and was
-removed the same day — the footer now just follows the page's content in
-normal flow. Printing awaits `document.fonts.ready` before calling
+min-height:100vh` to pin the footer to the page bottom; removed the same
+day (a known risk with `100vh` in print contexts, without `@page` sizing
+to anchor it) — the footer now just follows the page's content in normal
+flow. That wasn't the actual cause of the blank second page Kirt kept
+seeing, though: the real cause was the **`@media print` visibility rule**
+(`body *{ visibility:hidden; } #printArea, #printArea *{
+visibility:visible; } #printArea{ position:absolute; ... }`) — pre-dating
+this rebrand, kept as-is per the original brand-1a brief's "keep the
+existing visibility/#printArea approach" instruction. `visibility:hidden`
+keeps an element's layout box (unlike `display:none`), so the hidden
+Organizer/Tally view underneath — which can be tall — still drove the
+browser's printed page count, adding a real second, visually blank (since
+nothing painted there) page after whatever `#printArea` actually held.
+**Fixed 2026-09-27** (after the min-height fix didn't resolve it,
+reported back by Kirt): switched to `body > *:not(#printArea){
+display:none !important; }` / `#printArea{ display:block !important; }`,
+which removes the rest of the page from layout flow entirely, so
+pagination is driven only by `#printArea`'s own content. Same overall
+"hide everything but printArea" technique, just the CSS property that
+actually achieves it. Printing awaits `document.fonts.ready` before
+calling
 `window.print()` so Fraunces 900 italic score numbers don't get swapped
 mid-print — every print entry point
 (`printBlankSheets`, `printMyScores`, `printSignoffSheet`,
