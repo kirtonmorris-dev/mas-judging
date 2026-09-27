@@ -43,7 +43,6 @@ export function buildBlankSheetPageHtml(ev, cat, judgeName){
   const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
   if(contestants.length===0) return '';
   let html = `<div class="print-page">`;
-  html += `<div class="print-body">`;
   html += buildPrintHeader(ev, 'Blank Scoring Sheet');
   html += buildPrintSubrow(cat.name, judgeName);
   contestants.forEach(ct=>{
@@ -57,7 +56,6 @@ export function buildBlankSheetPageHtml(ev, cat, judgeName){
     html += `<div class="print-criteria-row" style="font-weight:700;"><span>Total (max ${catMaxTotal(cat)})</span><span class="print-blank-line"></span></div>`;
     html += `</div>`;
   });
-  html += `</div>`;
   html += buildPrintFooter();
   html += `</div>`;
   return html;
@@ -78,7 +76,6 @@ export async function printBlankSheets(ev){
 export function buildJudgeScoresPageHtml(ev, cat, judgeName){
   const contestants = cat.contestants.filter(ct=>ct.assignedJudges.includes(judgeName));
   let html = `<div class="print-page">`;
-  html += `<div class="print-body">`;
   html += buildPrintHeader(ev, 'Judge Scoring Record');
   html += buildPrintSubrow(cat.name, judgeName);
   contestants.forEach(ct=>{
@@ -102,7 +99,6 @@ export function buildJudgeScoresPageHtml(ev, cat, judgeName){
     }
     html += `</div>`;
   });
-  html += `</div>`;
   html += buildPrintFooter();
   html += `</div>`;
   return html;
@@ -114,14 +110,17 @@ export async function printMyScores(ev, cat, judgeName){
 }
 
 export function buildSignoffPageHtml(ev, cat){
-  const rows = rankContestants(ev, cat, cat.contestants, ev.judges);
+  // Only judges actually assigned to this category's entries get a
+  // signature line -- matches Live Tally's table columns (catJudges there),
+  // not every judge on the whole event.
+  const catJudges = ev.judges.filter(j => cat.contestants.some(ct => ct.assignedJudges.includes(j.name)));
+  const rows = rankContestants(ev, cat, cat.contestants, catJudges);
 
   let html = `<div class="print-page">`;
-  html += `<div class="print-body">`;
   html += buildPrintHeader(ev, 'Official Sign-off Sheet');
   html += buildPrintSubrow(cat.name);
   html += `<table class="print-table"><thead><tr><th>Place</th><th>Entry</th>`;
-  ev.judges.forEach(j=>{ html += `<th class="print-num">${escapeHtml(j.name)}</th>`; });
+  catJudges.forEach(j=>{ html += `<th class="print-num">${escapeHtml(j.name)}</th>`; });
   html += `<th class="print-num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{
     const place = r.total!==null ? (i+1) : '—';
@@ -138,7 +137,7 @@ export function buildSignoffPageHtml(ev, cat){
 
   html += `<div class="print-signatures">`;
   html += `<div class="print-sig-grid">`;
-  ev.judges.forEach(j=>{
+  catJudges.forEach(j=>{
     html += `<div class="sig-line"><div class="sig-blank"></div><span>${escapeHtml(j.name)} — Signature</span></div>`;
   });
   html += `</div>`;
@@ -146,10 +145,8 @@ export function buildSignoffPageHtml(ev, cat){
   html += `<div class="print-cert-sentence">I certify the scores recorded above are accurate and final as tallied by Judge D Show.</div>`;
   html += `<div class="print-cert-row">`;
   html += `<div class="sig-line"><div class="sig-blank"></div><span>Head Judge Signature</span></div>`;
-  html += `<div class="sig-line"><div class="sig-blank"></div><span>Organizer Signature</span></div>`;
   html += `<div class="sig-line print-cert-date"><div class="sig-blank"></div><span>Date</span></div>`;
   html += `</div></div>`;
-  html += `</div>`;
   html += `</div>`;
   html += buildPrintFooter();
   html += `</div>`;
