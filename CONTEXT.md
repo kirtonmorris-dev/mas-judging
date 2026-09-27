@@ -847,13 +847,26 @@ all three printouts (blank sheets, judge scoring record, sign-off sheet)
 share one black-and-white-only header/meta/footer chrome
 (`buildPrintHeader`/`buildPrintSubrow`/`buildPrintFooter`). The sign-off
 sheet's signature block is now two parts: one signature line per judge
-(masked name), then a certification block with the sentence "I certify the
-scores recorded above are accurate and final as tallied by Judge D Show."
-and three side-by-side lines — Head Judge Signature, Organizer Signature,
-Date. This **replaces** the old single "Judges Coordinator — Signature"
-line (same person, new title, never both printed). Printing now awaits
-`document.fonts.ready` before calling `window.print()` so Fraunces 900
-italic score numbers don't get swapped mid-print — every print entry point
+**assigned to that category's entries** (`catJudges` in
+`buildSignoffPageHtml` — the same per-category judge filter Live Tally
+uses for its table columns, not every judge on the whole event; fixed
+2026-09-27 after it initially used `ev.judges`, which printed only one
+signature line whenever an event had a single judge overall but multiple
+per-category assignments elsewhere), then a certification block with the
+sentence "I certify the scores recorded above are accurate and final as
+tallied by Judge D Show." and two side-by-side lines — Head Judge
+Signature, Date. This **replaces** the old single "Judges Coordinator —
+Signature" line (same person, new title, never both printed). An
+Organizer Signature line was tried in the same certification block and
+then removed the same day at Kirt's request — Head Judge + Date only.
+`.print-page` briefly had `display:flex; flex-direction:column;
+min-height:100vh` to pin the footer to the page bottom; this produced a
+spurious blank second page in real print output (a known risk with
+`100vh` in print contexts, without `@page` sizing to anchor it) and was
+removed the same day — the footer now just follows the page's content in
+normal flow. Printing awaits `document.fonts.ready` before calling
+`window.print()` so Fraunces 900 italic score numbers don't get swapped
+mid-print — every print entry point
 (`printBlankSheets`, `printMyScores`, `printSignoffSheet`,
 `printAllSignoffSheets`) is async now; callers that re-render right after
 printing (`views/organizer.js`'s Live Tally buttons) `await` it first so
