@@ -144,6 +144,12 @@ judging app isn't the first thing a prospect hits:
 - **Deployment Protection is OFF** — was previously blocking judges via
   Vercel's own auth gate; if the app is ever unreachable for users, check
   Vercel project Settings → Deployment Protection first.
+- **Vercel Web Analytics is installed** (merged 2026-09-27, from a branch
+  Vercel's own integration auto-created — `vercel/install-vercel-web-analytics-*`):
+  both `index.html` (marketing) and `app/index.html` (the app) load
+  `/_vercel/insights/script.js` after a `window.va` queue shim. View traffic
+  in the Vercel dashboard under the project's Analytics tab. No app logic
+  or env vars involved — pure client-side script tags.
 
 ### ⚠️ Network access varies by sandbox
 
