@@ -37,6 +37,30 @@
     h1 { font-size: 34px !important; }
   }
 
+  /* Demo video cards: portrait screen recordings, letterboxed on the
+     section's own cream background so the frame reads as one clean card
+     rather than a video floating in white space. */
+  .jds-demo-frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 560px;
+    background: #FAF3EC;
+  }
+  .jds-demo-video {
+    display: block;
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 560px;
+    object-fit: contain;
+  }
+  @media (max-width: 680px) {
+    .jds-demo-frame { height: auto; max-height: 70vh; }
+    .jds-demo-video { width: 100%; height: auto; max-height: 70vh; }
+  }
+
   /* FAQ accordion */
   .faq-item { border-bottom: 1px solid rgba(24,18,32,0.12); }
   .faq-trigger {
@@ -199,14 +223,16 @@
     </div>
   </div>
 
-  <!-- APP PREVIEW (real screenshots) -->
+  <!-- APP PREVIEW (demo videos) -->
   <div class="jds-pad-preview" style="width: 100%; padding: 0 40px 88px;">
     <div class="jds-grid2" style="max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; align-items: start;">
 
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(24,18,32,0.5);">Judge Login</div>
         <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; overflow: hidden; background: #FFFFFF; box-shadow: 0 20px 40px rgba(24,18,32,0.1);">
-          <img src="/images/judge-pin-entry.png" alt="Judge D Show PIN entry screen, showing event and judge number selection before a 4-digit PIN unlocks scoring" style="display: block; width: 100%; height: auto;">
+          <div class="jds-demo-frame">
+            <video class="jds-demo-video" src="/videos/judge-demo.mp4" poster="/videos/judge-demo-poster.jpg" controls playsinline preload="metadata" aria-label="Judge login demo"></video>
+          </div>
         </div>
         <p style="margin: 0; font-size: 14px; line-height: 1.6; color: rgba(24,18,32,0.65);">Judges pick their pre-assigned number and unlock it with their own 4-digit PIN &mdash; no app to install, no account to create.</p>
       </div>
@@ -214,7 +240,9 @@
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(24,18,32,0.5);">Organizer Setup</div>
         <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; overflow: hidden; background: #FFFFFF; box-shadow: 0 20px 40px rgba(24,18,32,0.1);">
-          <img src="/images/organizer-setup.png" alt="Organizer Setup tab showing judges added by real name, each assigned a masked Judge number and PIN status" style="display: block; width: 100%; height: auto;">
+          <div class="jds-demo-frame">
+            <video class="jds-demo-video" src="/videos/organizer-demo.mp4" poster="/videos/organizer-demo-poster.jpg" controls playsinline preload="metadata" aria-label="Organizer setup demo"></video>
+          </div>
         </div>
         <p style="margin: 0; font-size: 14px; line-height: 1.6; color: rgba(24,18,32,0.65);">Organizers add judges by real name and track PIN status here. Everywhere else in the app &mdash; Live Tally, Judge Detail, printed sheets &mdash; judges only ever show as a number.</p>
       </div>
