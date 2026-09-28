@@ -879,8 +879,25 @@ display:none !important; }` / `#printArea{ display:block !important; }`,
 which removes the rest of the page from layout flow entirely, so
 pagination is driven only by `#printArea`'s own content. Same overall
 "hide everything but printArea" technique, just the CSS property that
-actually achieves it. Printing awaits `document.fonts.ready` before
-calling
+actually achieves it. **Still not the full story**: "Print all
+categories" (`printAllSignoffSheets`, which concatenates one
+`buildSignoffPageHtml` per category into `#printArea`) kept producing its
+own extra trailing blank page even after the fix above, reported
+separately by Kirt. The page-break rule at the time was
+`.print-page{page-break-after:always}` +
+`.print-page:last-child{page-break-after:auto}` — correct given the
+actual DOM (every `#printArea` child is a `.print-page`, so `:last-child`
+does identify the true last one), but the one part of the mechanism that
+depended on a selector correctly matching a specific element's position
+rather than being structurally guaranteed. **Fixed the same day**:
+replaced it with `.print-page + .print-page{page-break-before:always}` —
+applies a forced break only *before* every `.print-page` after the first,
+which mathematically produces exactly N-1 breaks for N concatenated pages
+with no per-element position dependency at all. Functionally identical
+for the single-page print flows (`printBlankSheets`, `printMyScores`, a
+lone `printSignoffSheet`) since the rule simply never matches when
+there's only one `.print-page`. Printing awaits `document.fonts.ready`
+before calling
 `window.print()` so Fraunces 900 italic score numbers don't get swapped
 mid-print — every print entry point
 (`printBlankSheets`, `printMyScores`, `printSignoffSheet`,
