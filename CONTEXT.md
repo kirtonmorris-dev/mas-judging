@@ -3,8 +3,10 @@
 This file exists so any future Claude Code session (or human) picking up this
 project has the background needed to work on it safely. Read this before
 making changes. It reflects the state as of 2026-09-22 (updated same-day for
-the client-data-isolation work — see "Client-level data isolation" below) —
-if things look different, trust the code over this file and update this file.
+the client-data-isolation work — see "Client-level data isolation" below;
+further updated 2026-09-28 for the GA4 tag — see "Google Analytics (GA4)
+added to marketing page" below) — if things look different, trust the code
+over this file and update this file.
 
 ## What this is
 
@@ -1001,6 +1003,32 @@ portrait screen-recording instead:
 - `judge-scoring-list.png` (saved but never wired into the page — see the
   2026-09-22 entry above) is untouched; it's still just sitting in
   `images/` unused.
+
+## Google Analytics (GA4) added to marketing page (2026-09-28)
+
+The root `index.html` marketing page now loads the Google tag (gtag.js) for
+GA4 property `G-N2BDWBML0Q`. `/app` (`app/index.html`) is a fully separate
+HTML file with no shared shell — see "URL structure" above — so the tag was
+added only to the marketing page's `<head>` and required no path-based
+gating.
+
+- Standard `gtag.js` async loader + inline config snippet, placed right
+  after the existing Vercel Web Analytics `<script>` tags in `index.html`'s
+  `<head>`.
+- A delegated `click` listener on `document` looks for elements carrying
+  `data-ga-event`, reads any `data-ga-*` attributes off that element as
+  event params, and calls `gtag('event', <data-ga-event value>, {...})`.
+  Guarded by `typeof window.gtag !== 'function'` so a blocked/missing tag
+  (ad blockers, privacy extensions) never throws. **No events are wired up
+  yet** — no element on the page currently carries `data-ga-event`; that's
+  a follow-up.
+- Footer gained one line: "This site uses Google Analytics to understand
+  how visitors use this page." — same font-size/color as the existing
+  footer text, no other footer or marketing copy changed.
+- No `vercel.json` exists and neither HTML file has a CSP meta tag, so
+  there was no Content-Security-Policy to update.
+- Shipped on branch `feat/ga4-marketing-page`, verified on its Vercel
+  preview, then fast-forward merged to `main`.
 
 ## Copyright / ownership note
 
