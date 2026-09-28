@@ -261,6 +261,12 @@
        is driven only by #printArea's actual content. */
     body > *:not(#printArea){ display:none !important; }
     #printArea{ display:block !important; }
-    .print-page{ page-break-after: always; }
-    .print-page:last-child{ page-break-after: auto; }
+    /* Forces a break only *before* every print-page after the first,
+       rather than *after* every print-page except the last (the previous
+       .print-page{page-break-after:always}/.print-page:last-child{auto}
+       pair) -- this guarantees exactly N-1 breaks for N pages with no
+       dependency on :last-child correctly identifying the true last page,
+       which is the one thing that could silently produce an extra trailing
+       page if it ever mismatched. */
+    .print-page + .print-page{ page-break-before: always; }
   }
