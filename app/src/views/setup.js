@@ -123,6 +123,14 @@ export function renderCompetitionSettings(ev){
         ${SCOPE_OPTIONS.map(s=>`<option value="${s}" ${ev.scope===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
       </select>`;
 
+    html += `<div class="row" style="margin-top:14px;">
+        <div><label>Start date</label><input type="date" id="eventDateStartInput" value="${escapeAttr(ev.eventDateStart||'')}"></div>
+        <div><label>End date (optional)</label><input type="date" id="eventDateEndInput" value="${escapeAttr(ev.eventDateEnd||'')}"></div>
+      </div>
+      <div id="eventDateErr" class="err" style="display:none;">End date can't be before the start date.</div>
+      <div><label>Venue</label><input type="text" id="eventVenueInput" placeholder="e.g. Brooklyn Museum Plaza" value="${escapeAttr(ev.venue||'')}"></div>
+      <div class="small-note" style="margin-top:-8px; text-align:left;">Printed automatically on every scoring sheet and sign-off sheet. Leave blank to print a write-in line instead.</div>`;
+
     html += `<div class="chip-row" style="margin-top:2px;">
         <span class="chip etype ${ev.active?'on':''}" data-toggle-active>${ev.active ? '✓ Active for this Carnival' : 'Inactive for this Carnival'}</span>
       </div>`;
@@ -171,6 +179,25 @@ export function attachCompetitionSettingsHandlers(ev){
 
   const scopeSel = document.getElementById('competitionScopeSelect');
   if(scopeSel) scopeSel.onchange = async (e)=>{ ev.scope = e.target.value; await saveConfig(); render(); };
+
+  const dateStartIn = document.getElementById('eventDateStartInput');
+  const dateEndIn = document.getElementById('eventDateEndInput');
+  const dateErrEl = document.getElementById('eventDateErr');
+  const saveDateRange = async ()=>{
+    const start = dateStartIn.value || null;
+    const end = dateEndIn.value || null;
+    if(start && end && end < start){ dateErrEl.style.display = 'block'; return; }
+    dateErrEl.style.display = 'none';
+    ev.eventDateStart = start;
+    ev.eventDateEnd = end;
+    await saveConfig();
+    render();
+  };
+  if(dateStartIn) dateStartIn.onchange = saveDateRange;
+  if(dateEndIn) dateEndIn.onchange = saveDateRange;
+
+  const venueIn = document.getElementById('eventVenueInput');
+  if(venueIn) venueIn.onchange = async (e)=>{ ev.venue = e.target.value.trim() || null; await saveConfig(); render(); };
 
   const activeToggle = document.querySelector('[data-toggle-active]');
   if(activeToggle) activeToggle.onclick = async ()=>{ ev.active = !ev.active; await saveConfig(); render(); };

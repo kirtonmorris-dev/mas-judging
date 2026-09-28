@@ -51,6 +51,9 @@ export function normalizeConfig(cfg){
     if(!ev.fieldLabels.primary) ev.fieldLabels.primary = 'Band';
     if(!ev.fieldLabels.secondary) ev.fieldLabels.secondary = 'Masquerader';
     if(!ev.fieldLabels.detail) ev.fieldLabels.detail = 'Portrayal';
+    if(ev.eventDateStart === undefined) ev.eventDateStart = null;
+    if(ev.eventDateEnd === undefined) ev.eventDateEnd = null;
+    if(ev.venue === undefined) ev.venue = null;
     (ev.categories||[]).forEach(cat=>{
       if(cat.entryType !== 'individual' && cat.entryType !== 'group') cat.entryType = 'individual';
       if(!Array.isArray(cat.criteria) || cat.criteria.length===0) cat.criteria = cloneTemplate();

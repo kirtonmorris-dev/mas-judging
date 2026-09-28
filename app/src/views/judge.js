@@ -90,7 +90,7 @@ export function renderJudgeMode(){
     const unsaved = draftHasUnsavedWork(key, cat);
     const badgeClass = unsaved ? 'draft' : (done ? 'done' : 'pending');
     const badgeLabel = unsaved ? 'In Progress' : (done ? 'Scored' : 'Pending');
-    const stageBadge = ct.stage ? `<span class="badge pending" style="background:#EAEAF0; color:var(--ink-soft);">${escapeHtml(ct.stage)}</span>` : '';
+    const stageBadge = ct.stage ? `<span class="badge" style="background:#EAE5EE; color:var(--ink-soft);">${escapeHtml(ct.stage)}</span>` : '';
     html += `<div class="contestant-item" data-contestant="${ct.id}">
       <div class="info"><b>${escapeHtml(contestantTitle(cat,ct))}</b><span>${escapeHtml(contestantSubtitle(cat,ct))}</span></div>
       <span style="display:flex; gap:6px; align-items:center;">${stageBadge}<span class="badge ${badgeClass}">${badgeLabel}</span></span>

@@ -51,7 +51,7 @@ judging app isn't the first thing a prospect hits:
 
 - **`/` (repo root `index.html`)** — the marketing/landing page. A
   self-contained static page (own inline styles, own fonts — Fraunces +
-  IBM Plex Sans, distinct from the app's Bebas Neue + Inter), anchor
+  IBM Plex Sans, the same pairing the app uses), anchor
   links to its own sections, "Book a Call"/"Request a Quote" buttons to
   Calendly. **Do not wire this into the app** — no Supabase, no judging
   logic, nothing beyond static content and anchor links to itself. It is
@@ -112,7 +112,11 @@ judging app isn't the first thing a prospect hits:
   new event. See "Client-level data isolation" for why.
 - **External library**: SheetJS (xlsx), loaded from cdnjs.cloudflare.com,
   for reading uploaded Excel files.
-- **Fonts**: Google Fonts (Bebas Neue + Inter).
+- **Fonts**: Google Fonts, Fraunces (wordmark and score numerals, 900
+  italic; section titles 600 upright) + IBM Plex Sans (UI/body). This file
+  used to say Bebas Neue + Inter — that was stale; the code has used
+  Fraunces + IBM Plex Sans on a light cream background since before the
+  Direction 1a rebrand below, and this line is now corrected to match.
 - **No server-side code.** All logic runs in the browser; the browser talks
   straight to Supabase's REST/RPC endpoints.
 - **Dev tooling**: `scripts/stress-test.mjs` — a standalone Node 18+ script
@@ -769,6 +773,199 @@ resubmitted entry. Confirmed directly by Kirt on the preview before merge.
 - Per-event organizer PINs shipped 2026-09-24 (see "Per-event organizer
   PIN" above) — no rate limiting/lockout on the PIN check, same as the
   judge PIN, flagged there as an accepted gap, not fixed.
+
+## Brand system (Direction 1a) — applied 2026-09-27
+
+Rebrand pass across the app, its three printouts, and the marketing site.
+Branch `feat/brand-1a`. All decisions below were confirmed with Kirt before
+this pass, not something to reopen without asking.
+
+**Tokens** (`app/styles.css`'s `:root`; marketing `index.html` inlines the
+same hex values since it has no shared stylesheet):
+
+| Token | Hex | Use |
+|---|---|---|
+| `--magenta` | `#C50060` | Primary. Buttons, badge on light, links, active states |
+| `--gold` | `#FFC94D` | Accent. Only on navy/ink backgrounds, or as a fill behind dark text |
+| `--cream` | `#FAF3EC` | Page background |
+| `--ink` | `#181220` | Body text, rules |
+| `--navy` | `#0E182E` | Header band, score action bar, scoreboard cards |
+| `--card` | `#FFFFFF` | Cards on cream |
+| `--ink-soft` | `#5E5163` | Secondary text/captions (6.7:1 on cream) |
+| `--on-navy-soft` | `#B8B0C4` | Secondary text on navy (8.5:1) |
+| `--green` | `#1F7A3E` | Success text/badges (4.9:1 on cream) |
+| `--danger` | `#B3261E` | Error text/borders (5.9:1 on cream) |
+| `--pending` | `#9A5B00` | "Pending" badge text (4.9:1) |
+| `--draft` | `#3F51A3` | "In Progress" draft badge text (6.6:1) |
+| `--line` | `rgba(24,18,32,0.12)` | Hairlines |
+
+**Hard contrast rules, enforced throughout this pass**: gold text/icons
+never sit on cream or white (1.4:1 — fails); magenta text/icons never sit
+on navy (3.0:1 — fails). Every other pairing in the table above is at or
+above 4.5:1 for normal text. Places that used to put gold text on a light
+background (`.criterion .top .val`, `.badge.pending`, `.chip .pinflag.unset`,
+the marketing FAQ icons/category-pill borders) now use magenta or ink
+instead.
+
+**Type**: wordmark and score numerals are Fraunces 900 italic with
+`font-variant-numeric: tabular-nums` wherever a score can update live, so
+digits don't shift width. Section titles stay Fraunces 600 upright. UI/body
+text is IBM Plex Sans.
+
+**The "D" badge**: a circle (or a square tile at 25% border-radius for app
+icons) with a single Fraunces 900 italic "D" centered at ~0.53× the
+diameter. The glyph is an outlined SVG path (`app/index.html`'s header,
+marketing `index.html`'s nav, and every file under `icons/` all inline the
+same path), not live text — extracted from the real Fraunces-Italic
+variable font (wght=900, opsz=144, WONK=1) with `fonttools`, so it renders
+identically with or without the webfont loaded. Color pairings: magenta
+fill + cream "D" on light surfaces; gold fill + navy "D" on navy or in the
+icon files; never tinted, gradiented, or recolored outside those two
+pairings.
+
+**Icons** (`/icons/` at the repo root, shared between the marketing site
+and the app — chosen over a separate `/app/icons/` so both surfaces reuse
+one set): `favicon.svg` (gold circle, navy "D", the same outlined path),
+plus PNGs at 16/32 (circle, same artwork) and 180 (`apple-touch-icon.png`,
+square-tile)/192/512 (square-tile, 25% radius). Wired into both
+`app/index.html` and `index.html` with origin-absolute `/icons/...` paths,
+same convention as `/images/`.
+
+**Live Tally Table/Cards toggle** (`app/src/views/tally.js`,
+`app/src/utils.js`): a two-button toggle per category, default **Table**.
+Remembered per browser in `localStorage` under key `jds_tally_view`
+(`getTallyView`/`setTallyView` in `utils.js`, same try/catch pattern as
+`getLastPrintedAt`) — reading it fresh on every render is what makes the
+choice survive the 15s polling re-render, no extra state-preservation logic
+needed. Card view is one navy card per entry with a 2px gold border on
+first place; both views share one ranking helper, `rankContestants` in
+`utils.js` (also reused by the sign-off print sheet), so the math is never
+computed twice.
+
+**Print (`app/src/print.js` + `app/styles.css`'s `@media print` rules)**:
+all three printouts (blank sheets, judge scoring record, sign-off sheet)
+share one black-and-white-only header/meta/footer chrome
+(`buildPrintHeader`/`buildPrintSubrow`/`buildPrintFooter`). The sign-off
+sheet's signature block is now two parts: one signature line per judge
+**assigned to that category's entries** (`catJudges` in
+`buildSignoffPageHtml` — the same per-category judge filter Live Tally
+uses for its table columns, not every judge on the whole event; fixed
+2026-09-27 after it initially used `ev.judges`, which printed only one
+signature line whenever an event had a single judge overall but multiple
+per-category assignments elsewhere), then a certification block with the
+sentence "I certify the scores recorded above are accurate and final as
+tallied by Judge D Show." and two side-by-side lines — Head Judge
+Signature, Date. This **replaces** the old single "Judges Coordinator —
+Signature" line (same person, new title, never both printed). An
+Organizer Signature line was tried in the same certification block and
+then removed the same day at Kirt's request — Head Judge + Date only.
+`.print-page` briefly had `display:flex; flex-direction:column;
+min-height:100vh` to pin the footer to the page bottom; removed the same
+day (a known risk with `100vh` in print contexts, without `@page` sizing
+to anchor it) — the footer now just follows the page's content in normal
+flow. That wasn't the actual cause of the blank second page Kirt kept
+seeing, though: the real cause was the **`@media print` visibility rule**
+(`body *{ visibility:hidden; } #printArea, #printArea *{
+visibility:visible; } #printArea{ position:absolute; ... }`) — pre-dating
+this rebrand, kept as-is per the original brand-1a brief's "keep the
+existing visibility/#printArea approach" instruction. `visibility:hidden`
+keeps an element's layout box (unlike `display:none`), so the hidden
+Organizer/Tally view underneath — which can be tall — still drove the
+browser's printed page count, adding a real second, visually blank (since
+nothing painted there) page after whatever `#printArea` actually held.
+**Fixed 2026-09-27** (after the min-height fix didn't resolve it,
+reported back by Kirt): switched to `body > *:not(#printArea){
+display:none !important; }` / `#printArea{ display:block !important; }`,
+which removes the rest of the page from layout flow entirely, so
+pagination is driven only by `#printArea`'s own content. Same overall
+"hide everything but printArea" technique, just the CSS property that
+actually achieves it. **Still not the full story**: "Print all
+categories" (`printAllSignoffSheets`, which concatenates one
+`buildSignoffPageHtml` per category into `#printArea`) kept producing its
+own extra trailing blank page even after the fix above, reported
+separately by Kirt. The page-break rule at the time was
+`.print-page{page-break-after:always}` +
+`.print-page:last-child{page-break-after:auto}` — correct given the
+actual DOM (every `#printArea` child is a `.print-page`, so `:last-child`
+does identify the true last one), but the one part of the mechanism that
+depended on a selector correctly matching a specific element's position
+rather than being structurally guaranteed. **Fixed the same day**:
+replaced it with `.print-page + .print-page{page-break-before:always}` —
+applies a forced break only *before* every `.print-page` after the first,
+which mathematically produces exactly N-1 breaks for N concatenated pages
+with no per-element position dependency at all. Functionally identical
+for the single-page print flows (`printBlankSheets`, `printMyScores`, a
+lone `printSignoffSheet`) since the rule simply never matches when
+there's only one `.print-page`. Printing awaits `document.fonts.ready`
+before calling
+`window.print()` so Fraunces 900 italic score numbers don't get swapped
+mid-print — every print entry point
+(`printBlankSheets`, `printMyScores`, `printSignoffSheet`,
+`printAllSignoffSheets`) is async now; callers that re-render right after
+printing (`views/organizer.js`'s Live Tally buttons) `await` it first so
+the "edited since printed" badge state reflects the print immediately.
+
+**Event date and venue** (see "Event date, venue, and their migration"
+below for the DB side): Setup → Competition settings has Start date, End
+date (optional, for multi-day events), and Venue inputs, saved through the
+normal `saveConfig()` flow with end-before-start validated client-side.
+Both printouts and the app-side state just read `ev.eventDateStart` /
+`ev.eventDateEnd` / `ev.venue` off the same event object everything else
+already reads/writes — no separate fetch. `formatEventDateRange` in
+`utils.js` renders a single date or a "Aug 30 – Sep 1, 2026" range for
+print.
+
+**Marketing site** (`index.html`): same token swap, applied as literal hex
+values since the page has no shared stylesheet with the app. Nav logo is
+now the badge + wordmark lockup (magenta badge, ink wordmark) instead of a
+plain text link. All CTA buttons ("Book a Call", "Book a 20-Minute Call",
+"Request a Quote") are magenta-on-cream on light sections; the "Why It's
+Different" dark section keeps gold-on-navy for its eyebrow label and
+icons. The Final CTA section's own background is the gold token (a
+deliberate exception to the light/dark button split — its ink-on-cream
+button reads correctly against a gold background where a magenta button
+would not add contrast benefit and reads worse). No copy, images,
+Calendly links, or the on-hold background-visual work were touched.
+
+## Event date, venue, and their migration (2026-09-27)
+
+Added as part of the Direction 1a rebrand above, so printouts could show a
+real event date/venue instead of a blank write-in line. Migration
+`add_event_date_and_venue`, applied directly to the shared production
+`pjqojhtqxljnukwlzekr` project after Kirt reviewed the exact SQL and said
+"apply it" (this app has no staging copy — see the DB section above).
+
+- `events` gained three nullable columns: `event_date_start date`,
+  `event_date_end date`, `venue text`. Additive only — existing events and
+  any old deployed client code keep working unchanged.
+- `get_event_config` now also returns `eventDateStart`, `eventDateEnd`,
+  `venue`. Re-verified `organizer_pin` is still not selected (same check
+  done after every change to this function, per the admin-PIN and
+  per-event-PIN writeups above).
+- `replace_event_config` now persists those three fields from `p_event`,
+  using the same `coalesce(...)` pattern as the existing text fields
+  (`contestant_label`, etc.): a payload that omits a key leaves that
+  column untouched rather than nulling it out, so an old cached client
+  (or any future direct RPC caller that doesn't know about these fields
+  yet) can't accidentally wipe them. The optimistic-concurrency `rev`
+  check is unchanged.
+- Verified as `anon` (`set local role anon;`) via the actual
+  `get_event_config`/`replace_event_config` RPC path, not just privileged
+  SQL: wrote a date range + venue to the **Testing - Panorama** sandbox
+  event, confirmed both fields round-tripped and every existing
+  judge/category/contestant survived (`replace_event_config` fully
+  replaces an event's judges/categories/contestants on every call — see
+  the DB section above), then called it again with those three keys
+  omitted and confirmed the values stayed put rather than going null. Test
+  data was reset back to null afterward so the sandbox event doesn't carry
+  stale test values into the next person's testing.
+- `scripts/stress-test.mjs` could not be re-run from this sandbox after
+  the migration — this environment's network egress doesn't reach
+  `supabase.co` (a known, previously-documented limitation — see "⚠️
+  Network access varies by sandbox" above). DB-level verification above
+  substitutes for it; a human (or a sandbox with Supabase egress) should
+  still run `node scripts/stress-test.mjs` before/after any further
+  backend change to this migration.
 
 ## Copyright / ownership note
 
