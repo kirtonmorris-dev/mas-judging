@@ -127,9 +127,14 @@ judging app isn't the first thing a prospect hits:
 - **Image assets**: a root-level `images/` folder (referenced as
   `/images/...` from `index.html`, following the same origin-absolute
   convention as `/app`'s assets) holds marketing-page images —
-  `kirt-headshot.jpg`, `judge-pin-entry.png`, `organizer-setup.png`,
-  `judge-scoring-list.png` (saved, not yet used). Follow this convention
-  for new marketing-page images rather than inventing a new folder.
+  `kirt-headshot.jpg`, `judge-scoring-list.png` (saved, not yet used).
+  Follow this convention for new marketing-page images rather than
+  inventing a new folder.
+- **Video assets**: a root-level `videos/` folder, same origin-absolute
+  convention (`/videos/...`), holds the two "How It Works" demo clips and
+  their poster JPGs — see the 2026-09-28 entry below. `judge-pin-entry.png`
+  and `organizer-setup.png` used to live in `images/`; both were deleted
+  once the videos replaced them on the page.
 
 ## Deployment
 
@@ -966,6 +971,36 @@ real event date/venue instead of a blank write-in line. Migration
   substitutes for it; a human (or a sandbox with Supabase egress) should
   still run `node scripts/stress-test.mjs` before/after any further
   backend change to this migration.
+
+## How It Works screenshots replaced with demo videos (2026-09-28)
+
+The two static screenshots in the "How It Works" preview section
+(`index.html`) — `images/judge-pin-entry.png` and
+`images/organizer-setup.png` — are gone. Both cards now embed a real
+portrait screen-recording instead:
+
+- **Judge Login** card: `videos/judge-demo.mp4`, poster
+  `videos/judge-demo-poster.jpg`.
+- **Organizer Setup** card: `videos/organizer-demo.mp4`, poster
+  `videos/organizer-demo-poster.jpg`. Re-encoded (H.264/AAC, faststart)
+  from a 10.27 MB source down to 7.0 MB to stay under the 8 MB budget;
+  `judge-demo.mp4` only needed a faststart remux (no re-encode) since it
+  was already under budget. Both are native `<video controls playsinline
+  preload="metadata">` — no `autoplay`, `loop`, or `muted`, since both
+  clips carry background music that needs a deliberate click to play.
+- New root-level `videos/` folder holds the mp4s and posters, following
+  the same origin-absolute (`/videos/...`) convention as the existing
+  `images/` folder — this site has no `/public` folder, so don't add one
+  just to match an unrelated project's layout.
+- Card chrome (rounded corners, border, shadow, uppercase label, caption
+  copy) is unchanged; only the screenshot `<img>` was swapped for the
+  video, wrapped in a `.jds-demo-frame` div that fills letterbox space
+  with the section's cream background (`#FAF3EC`) and caps video height
+  at 560px on desktop / ~70vh on mobile via the existing 680px
+  breakpoint.
+- `judge-scoring-list.png` (saved but never wired into the page — see the
+  2026-09-22 entry above) is untouched; it's still just sitting in
+  `images/` unused.
 
 ## Copyright / ownership note
 
