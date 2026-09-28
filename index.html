@@ -14,6 +14,30 @@
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 </script>
 <script defer src="/_vercel/insights/script.js"></script>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-N2BDWBML0Q"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-N2BDWBML0Q');
+</script>
+<script>
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('[data-ga-event]');
+    if(!el || typeof window.gtag !== 'function') return;
+    var eventName = el.getAttribute('data-ga-event');
+    var params = {};
+    for (var i = 0; i < el.attributes.length; i++) {
+      var attr = el.attributes[i];
+      if (attr.name.indexOf('data-ga-') === 0 && attr.name !== 'data-ga-event') {
+        params[attr.name.slice(8)] = attr.value;
+      }
+    }
+    window.gtag('event', eventName, params);
+  });
+</script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; background: #FAF3EC; color: #181220; }
@@ -692,6 +716,7 @@
       <div>&#169; 2026 Judge D Show. An Immortelle Advisory Group product.</div>
       <div>Built by Kirt Morris, Founder &amp; Principal Consultant.</div>
     </div>
+    <div style="max-width: 1160px; margin: 8px auto 0; font-size: 13.5px;">This site uses Google Analytics to understand how visitors use this page.</div>
   </div>
 
 </div>
