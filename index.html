@@ -43,6 +43,20 @@
   body { margin: 0; font-family: 'IBM Plex Sans', sans-serif; background: #FAF3EC; color: #181220; }
   a { color: inherit; text-decoration: none; }
   a:hover { opacity: 0.85; }
+
+  /* Design system: interaction states. Buttons step along the magenta ramp
+     on cream and the gold ramp on navy; focus is a 2px ring, magenta on
+     cream and gold on navy; the only transition is a 120ms fill change. */
+  .jds-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; transition: background-color 120ms cubic-bezier(.2,0,0,1); }
+  .jds-btn-p:hover { background: #A8004F !important; opacity: 1; }
+  .jds-btn-p:active { background: #8A0042 !important; transition: none; }
+  .jds-btn-s:hover { background: rgba(24,18,32,0.06); opacity: 1; }
+  .jds-btn-s:active { background: rgba(24,18,32,0.12); transition: none; }
+  .jds-btn-g:hover { background: #FFD878 !important; opacity: 1; }
+  .jds-btn-g:active { background: #F0B52F !important; transition: none; }
+  a:focus-visible, button:focus-visible { outline: 2px solid #C50060; outline-offset: 2px; }
+  .jds-dark a:focus-visible, .jds-dark button:focus-visible { outline-color: #FFC94D; }
+  @media (prefers-reduced-motion: reduce) { .jds-btn { transition: none; } }
   .jds-badge{ width:1em; height:1em; display:inline-block; flex:0 0 auto; vertical-align:-0.12em; }
 
   /* Mobile: the layout below is authored with fixed 2/3-column grids and
@@ -103,9 +117,9 @@
     font-size: 16px;
     color: #181220;
   }
-  .faq-trigger:focus-visible { outline: 2px solid #C50060; outline-offset: 2px; border-radius: 4px; }
+  .faq-trigger:focus-visible { outline: 2px solid #C50060; outline-offset: 2px; border-radius: 0; }
   .faq-icon { position: relative; width: 16px; height: 16px; flex-shrink: 0; }
-  .faq-icon-h, .faq-icon-v { position: absolute; background: #C50060; border-radius: 1px; top: 50%; left: 50%; }
+  .faq-icon-h, .faq-icon-v { position: absolute; background: #C50060; border-radius: 0; top: 50%; left: 50%; }
   .faq-icon-h { width: 16px; height: 2px; margin-top: -1px; margin-left: -8px; }
   .faq-icon-v { width: 2px; height: 16px; margin-top: -8px; margin-left: -1px; transition: transform 0.18s ease; }
   .faq-trigger[aria-expanded="true"] .faq-icon-v { transform: rotate(90deg); }
@@ -113,7 +127,7 @@
   .faq-panel.faq-panel-open { grid-template-rows: 1fr; }
   .faq-panel-inner { overflow: hidden; }
   .faq-panel-inner p { margin: 0 4px 18px; font-size: 15px; line-height: 1.6; color: rgba(24,18,32,0.7); }
-  #faqShowAllBtn { all: unset; box-sizing: border-box; display: block; margin: 24px auto 0; padding: 12px 24px; border: 1.5px solid rgba(24,18,32,0.25); border-radius: 8px; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; min-height: 44px; }
+  #faqShowAllBtn { all: unset; box-sizing: border-box; display: block; margin: 24px auto 0; padding: 12px 24px; border: 1.5px solid rgba(24,18,32,0.25); border-radius: 0; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; min-height: 44px; }
   @media (prefers-reduced-motion: reduce) {
     .faq-icon-v, .faq-panel { transition: none; }
   }
@@ -135,7 +149,7 @@
         <a href="#built-different" style="font-size: 15px; font-weight: 500;">Why It's Different</a>
         <a href="#faq" style="font-size: 15px; font-weight: 500;">FAQ</a>
         <a href="#pricing" style="font-size: 15px; font-weight: 500;">Pricing</a>
-        <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 10px 20px; border-radius: 8px; font-size: 15px; font-weight: 600;">Book a Call</a>
+        <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 10px 20px; border-radius: 0; font-size: 15px; font-weight: 600;">Book a Call</a>
       </div>
     </div>
   </div>
@@ -147,8 +161,8 @@
       <h1 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 52px; line-height: 1.08; letter-spacing: -0.01em;">Your judges are still scoring on paper. Your results are still late.</h1>
       <p style="margin: 0; font-size: 19px; line-height: 1.6; color: rgba(24,18,32,0.72); max-width: 620px;">Judge D Show puts every score on a judge's phone the moment it happens, so your tally is accurate and ready before the last contestant leaves the stage.</p>
       <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
-        <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
-        <a href="#how-it-works" style="border: 1.5px solid rgba(24,18,32,0.25); padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600;">See How It Works</a>
+        <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 14px 28px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
+        <a class="jds-btn jds-btn-s" href="#how-it-works" style="border: 1.5px solid rgba(24,18,32,0.25); padding: 14px 28px; border-radius: 0; font-size: 16px; font-weight: 600;">See How It Works</a>
       </div>
     </div>
 
@@ -177,17 +191,17 @@
       </div>
 
       <div class="jds-grid3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;">
-        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; padding: 28px;">
+        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 0; padding: 28px;">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#181220" stroke-width="1.6" style="margin-bottom: 16px;"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke-linejoin="round"/><path d="M14 3v5h5" stroke-linejoin="round"/><path d="M8 13h8M8 17h5" stroke-linecap="round"/></svg>
           <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700;">Paper sheets get lost or smudged.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.55; color: rgba(24,18,32,0.68);">Scores travel by hand between judges and a tabulation table, and there's no record of what happened in between.</p>
         </div>
-        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; padding: 28px;">
+        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 0; padding: 28px;">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#181220" stroke-width="1.6" style="margin-bottom: 16px;"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h3M13 11h3M8 15h3" stroke-linecap="round"/></svg>
           <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700;">Totals get added by hand, under pressure.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.55; color: rgba(24,18,32,0.68);">A rushed manual tally, with a crowd waiting, is exactly where a legitimate placement gets challenged later.</p>
         </div>
-        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; padding: 28px;">
+        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 0; padding: 28px;">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#181220" stroke-width="1.6" style="margin-bottom: 16px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700;">Results wait on whoever has the calculator.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.55; color: rgba(24,18,32,0.68);">The band that just performed, and everyone in the stands, ends up waiting far longer than the performance itself.</p>
@@ -206,17 +220,17 @@
 
       <div class="jds-grid3" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px;">
         <div>
-          <div style="width: 44px; height: 44px; border-radius: 10px; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">1</div>
+          <div style="width: 44px; height: 44px; border-radius: 0; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">1</div>
           <h3 style="margin: 0 0 10px; font-size: 19px; font-weight: 700;">Judges score on their phone.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: rgba(24,18,32,0.68);">They log in with a PIN, no app to install, and score each contestant against your own criteria and point scale.</p>
         </div>
         <div>
-          <div style="width: 44px; height: 44px; border-radius: 10px; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">2</div>
+          <div style="width: 44px; height: 44px; border-radius: 0; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">2</div>
           <h3 style="margin: 0 0 10px; font-size: 19px; font-weight: 700;">Results tally live.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: rgba(24,18,32,0.68);">Organizers watch the tally update the moment each judge submits, with any drop-high, drop-low, or averaging rule applied automatically.</p>
         </div>
         <div>
-          <div style="width: 44px; height: 44px; border-radius: 10px; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">3</div>
+          <div style="width: 44px; height: 44px; border-radius: 0; background: #181220; color: #FAF3EC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin-bottom: 20px;">3</div>
           <h3 style="margin: 0 0 10px; font-size: 19px; font-weight: 700;">Print the official sign-off sheet.</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: rgba(24,18,32,0.68);">Close out the category and print a signed record for the podium, with no transcription step in between.</p>
         </div>
@@ -253,7 +267,7 @@
 
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(24,18,32,0.5);">Judge Login</div>
-        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; overflow: hidden; background: #FFFFFF; box-shadow: 0 20px 40px rgba(24,18,32,0.1);">
+        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 0; overflow: hidden; background: #FFFFFF;">
           <div class="jds-demo-frame">
             <video class="jds-demo-video" src="/videos/judge-demo.mp4" poster="/videos/judge-demo-poster.jpg" controls playsinline preload="metadata" aria-label="Judge login demo"></video>
           </div>
@@ -263,7 +277,7 @@
 
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(24,18,32,0.5);">Organizer Setup</div>
-        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 14px; overflow: hidden; background: #FFFFFF; box-shadow: 0 20px 40px rgba(24,18,32,0.1);">
+        <div style="border: 1px solid rgba(24,18,32,0.12); border-radius: 0; overflow: hidden; background: #FFFFFF;">
           <div class="jds-demo-frame">
             <video class="jds-demo-video" src="/videos/organizer-demo.mp4" poster="/videos/organizer-demo-poster.jpg" controls playsinline preload="metadata" aria-label="Organizer setup demo"></video>
           </div>
@@ -274,7 +288,7 @@
   </div>
 
   <!-- BUILT DIFFERENT -->
-  <div id="built-different" class="jds-pad-lg" style="width: 100%; background: #0E182E; color: #FAF3EC; padding: 88px 40px;">
+  <div id="built-different" class="jds-pad-lg jds-dark" style="width: 100%; background: #0E182E; color: #FAF3EC; padding: 88px 40px;">
     <div style="max-width: 1080px; margin: 0 auto;">
       <div style="max-width: 640px; margin-bottom: 56px;">
         <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #FFC94D; margin-bottom: 12px;">Why It's Different</div>
@@ -697,21 +711,21 @@
       <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #C50060; margin-bottom: 16px;">Pricing</div>
       <h2 style="margin: 0 0 16px; font-family: 'Fraunces', serif; font-weight: 600; font-size: 32px; line-height: 1.2;">Priced around your event, not a subscription you don't need.</h2>
       <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.6; color: rgba(24,18,32,0.7);">Every competition is different in judge count, categories, and rounds. Tell us about yours and we'll send a quote built around what you're actually running.</p>
-      <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="display: inline-block; background: #C50060; color: #FAF3EC; padding: 15px 32px; border-radius: 8px; font-size: 16px; font-weight: 700;">Request a Quote</a>
+      <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="display: inline-block; background: #C50060; color: #FAF3EC; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Request a Quote</a>
     </div>
   </div>
 
   <!-- FINAL CTA -->
-  <div class="jds-pad-md" style="width: 100%; background: #FFC94D; padding: 64px 40px;">
+  <div class="jds-pad-md jds-dark" style="width: 100%; background: #0E182E; color: #FAF3EC; padding: 64px 40px;">
     <div style="max-width: 780px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px;">
-      <h2 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; line-height: 1.2; color: #181220;">Ready to see it in your judges' hands?</h2>
-      <p style="margin: 0; font-size: 16px; color: rgba(24,18,32,0.75);">A 20-minute call is enough to show you the judge screen, the live tally, and the printed sign-off sheet.</p>
-      <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #181220; color: #FAF3EC; padding: 15px 32px; border-radius: 8px; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
+      <h2 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; line-height: 1.2; color: #FAF3EC;">Ready to see it in your judges' hands?</h2>
+      <p style="margin: 0; font-size: 16px; color: #B8B0C4;">A 20-minute call is enough to show you the judge screen, the live tally, and the printed sign-off sheet.</p>
+      <a class="jds-btn jds-btn-g" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #FFC94D; color: #0E182E; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
     </div>
   </div>
 
   <!-- FOOTER -->
-  <div class="jds-pad-sm" style="width: 100%; background: #0E182E; color: rgba(250,243,236,0.6); padding: 32px 40px;">
+  <div class="jds-pad-sm jds-dark" style="width: 100%; background: #0E182E; color: rgba(250,243,236,0.6); padding: 32px 40px; border-top: 1px solid rgba(250,243,236,0.12);">
     <div style="max-width: 1160px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 13.5px;">
       <div>&#169; 2026 Judge D Show. An Immortelle Advisory Group product.</div>
       <div>Built by Kirt Morris, Founder &amp; Principal Consultant.</div>
