@@ -1,6 +1,20 @@
 import { state } from '../state.js';
 import { contestantSubtitle, contestantTitle, escapeHtml, getLastPrintedAt, getTallyView, rankContestants, shortJudgeLabel } from '../utils.js';
 
+// Last total rendered per event/category/contestant. When a render shows a
+// different total than the previous one (a judge just submitted or was
+// corrected), that total gets a one-shot .score-flash so organizers can see
+// which line moved. First sight of a total never flashes, so page load,
+// category switches and table/cards toggles stay quiet.
+const lastTotals = new Map();
+function totalChanged(scope, contestantId, total){
+  const key = scope + '|' + contestantId;
+  const had = lastTotals.has(key);
+  const prev = lastTotals.get(key);
+  lastTotals.set(key, total);
+  return had && prev !== total;
+}
+
 export function renderTally(ev){
   if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one below.</div>';
 
@@ -53,11 +67,12 @@ export function renderTally(ev){
       <button data-tally-view="cards" class="${view==='cards'?'active':''}">Cards</button>
     </div>`;
 
-  html += view === 'cards' ? renderTallyCards(cat, rows) : renderTallyTable(cat, catJudges, rows);
+  const scope = ev.id + '|' + cat.id;
+  html += view === 'cards' ? renderTallyCards(cat, rows, scope) : renderTallyTable(cat, catJudges, rows, scope);
   return html;
 }
 
-function renderTallyTable(cat, catJudges, rows){
+function renderTallyTable(cat, catJudges, rows, scope){
   let html = '<div class="card"><table><thead><tr><th style="width:26px;">Pos.</th><th>Entry</th>';
   catJudges.forEach(j=>{ html += `<th style="width:32px;">${escapeHtml(shortJudgeLabel(j.name))}</th>`; });
   html += '<th style="width:42px;">Total</th></tr></thead><tbody>';
@@ -71,25 +86,27 @@ function renderTallyTable(cat, catJudges, rows){
       else if(p.status==='pending') html += `<td class="num">&mdash;</td>`;
       else html += `<td class="num">${p.value}</td>`;
     });
-    html += `<td class="num">${r.total===null?'&mdash;':r.total}</td></tr>`;
+    const flash = totalChanged(scope, r.contestant.id, r.total) ? ' score-flash' : '';
+    html += `<td class="num"><span class="score-num${flash}">${r.total===null?'&mdash;':r.total}</span></td></tr>`;
   });
   html += '</tbody></table></div>';
   return html;
 }
 
-function renderTallyCards(cat, rows){
+function renderTallyCards(cat, rows, scope){
   let html = '<div class="tally-card-grid">';
   rows.forEach((r,i)=>{
     const place = r.total!==null ? (i+1) : '—';
     const submittedCount = r.perJudge.filter(p=>p.status==='scored').length;
     const totalAssigned = r.perJudge.filter(p=>p.status!=='na').length;
     const isRank1 = i===0 && r.total!==null;
+    const flash = totalChanged(scope, r.contestant.id, r.total) ? ' score-flash' : '';
     html += `<div class="tally-card${isRank1?' rank1':''}">
         <div class="tally-card-top">
           <span class="tally-card-place-name">${place}. ${escapeHtml(contestantTitle(cat,r.contestant))}</span>
         </div>
         <div class="tally-card-subtitle">${escapeHtml(contestantSubtitle(cat,r.contestant))}</div>
-        <div class="tally-card-total">${r.total===null?'—':r.total}</div>
+        <div class="tally-card-total"><span class="score-num${flash}">${r.total===null?'—':r.total}</span></div>
         <div class="tally-card-status">${submittedCount} of ${totalAssigned} judge${totalAssigned!==1?'s':''} submitted</div>
       </div>`;
   });
