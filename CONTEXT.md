@@ -1104,6 +1104,20 @@ preview, then fast-forward merged to `main`):**
   screens. If something looks off in production, check the judge scoring,
   organizer, live tally and PIN screens first.
 
+**Score-post flash (2026-10-02, built and merged):** the Live Tally flashes a
+total once when it changes. `app/src/views/tally.js` keeps a module-level
+`lastTotals` map keyed `eventId|categoryId|contestantId`; `totalChanged()`
+returns true only when that key was seen before with a different total
+(including "-" to a number). Changed totals are wrapped in
+`<span class="score-num score-flash">` in both the table and the cards view.
+`app/styles.css`: `@keyframes score-flash` is a 40%-ish accent tint (magenta
+at 18% on the table, gold at 40% on the navy cards) plus a 6px settle over
+600ms with `cubic-bezier(.2,0,0,1)`, once. It never fires on first load,
+category/stage switches, table/cards toggles, or an unchanged re-render.
+`prefers-reduced-motion` disables it. The tally re-renders from `render()`
+after the polling refresh in `main.js`, so a flash can be missed only if two
+renders land inside 600ms. No other decorative motion exists in the app.
+
 **Decided against (2026-10-02):** a full dark (App Navy) in-app theme. It
 was built and previewed on a branch (semantic `--bg`/`--card`/`--ink`/`--accent`
 /`--action` tokens, gold actions, `?theme=light` opt-in) and Kirt did not like
@@ -1114,8 +1128,6 @@ system itself; the app just doesn't use it.
 
 **Still open (follow-ups, not decided yet):**
 
-- The 600ms score-post flash (40% accent tint, 6px settle) needs a small JS
-  change in the tally/judge views to detect a changed total; not built.
 - Copy, layout, GA4 and the print sheet were not changed in either pass
   (the print sheet already matched the system).
 
