@@ -1104,12 +1104,16 @@ preview, then fast-forward merged to `main`):**
   screens. If something looks off in production, check the judge scoring,
   organizer, live tally and PIN screens first.
 
+**Decided against (2026-10-02):** a full dark (App Navy) in-app theme. It
+was built and previewed on a branch (semantic `--bg`/`--card`/`--ink`/`--accent`
+/`--action` tokens, gold actions, `?theme=light` opt-in) and Kirt did not like
+it, so it was never merged. The app stays on the light cream layout with navy
+header and action bars. Don't rebuild it unprompted. The design system
+artifact still defines a dark theme because it is part of the brief for the
+system itself; the app just doesn't use it.
+
 **Still open (follow-ups, not decided yet):**
 
-- The app is still the light cream layout with navy bands. The brief calls
-  for a full dark (App Navy) in-app theme using the `ground`/`surface`/
-  `text`/`accent` role swap in the design system; that touches every screen
-  and was deferred.
 - The 600ms score-post flash (40% accent tint, 6px settle) needs a small JS
   change in the tally/judge views to detect a changed total; not built.
 - Copy, layout, GA4 and the print sheet were not changed in either pass
