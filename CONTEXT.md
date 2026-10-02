@@ -1061,7 +1061,7 @@ hover, `#F0B52F` pressed).
   navy ground, cream-at-6% surface, gold accent. Primary button: magenta
   with cream text on light, gold with navy text on dark.
 
-**Marketing page changes (`index.html` only, shipped via
+**Marketing page changes (`index.html`, shipped via
 `claude/laughing-albattani-3z40sl`, previewed on Vercel, then fast-forward
 merged to `main`):**
 
@@ -1083,11 +1083,37 @@ merged to `main`):**
   the two navy bands read as separate.
 - Reduced-motion users get no button transition.
 
-**Not changed:** `/app` (`app/styles.css` still uses the older 10-14px
-radii and white-card shadows on the tally scoreboard); copy, layout, GA4,
-the print sheet (already matches the system). Applying the system to the
-judging app is a follow-up, and should wait until after a live event
-since the app is in use at real events.
+**App pass (2026-10-02, `app/styles.css` only, same flow: branch, Vercel
+preview, then fast-forward merged to `main`):**
+
+- Same shape rule as the site: every container and control is radius 0
+  (cards, inputs, selects, `.btn`, `.stepper-btn`, `.score-input`,
+  `.contestant-item`/`-row`, `.toast`, `.err`, `.import-box`, `.crit-box`,
+  `.folder-tab`, `.tally-card`). Pills stay round: `.badge`, `.chip`,
+  `.pinflag`, the mode/tally toggle buttons, the D badge.
+- Removed the scalloped `.card.ticket::after` radial-gradient edge (the
+  `ticket` class is still on the markup because `judge.js` queries it) and
+  the action bar's drop shadow (now a 12% cream top hairline).
+- `.btn-primary` hover `#A8004F`, active `#8A0042`; `.btn-outline*` hover and
+  active ink tints; 120ms background transition, off for reduced motion.
+  The Submit button in `.score-action-bar` is now gold with navy text
+  (hover `#FFD878`, active `#F0B52F`) because it sits on navy.
+- Global `:focus-visible` ring: 2px magenta, 2px offset; gold inside
+  `.header-band`, `.score-action-bar` and `.tally-card`.
+- Verified only against a mock-up of the stylesheet, not the live data-driven
+  screens. If something looks off in production, check the judge scoring,
+  organizer, live tally and PIN screens first.
+
+**Still open (follow-ups, not decided yet):**
+
+- The app is still the light cream layout with navy bands. The brief calls
+  for a full dark (App Navy) in-app theme using the `ground`/`surface`/
+  `text`/`accent` role swap in the design system; that touches every screen
+  and was deferred.
+- The 600ms score-post flash (40% accent tint, 6px settle) needs a small JS
+  change in the tally/judge views to detect a changed total; not built.
+- Copy, layout, GA4 and the print sheet were not changed in either pass
+  (the print sheet already matched the system).
 
 ## Copyright / ownership note
 
