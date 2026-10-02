@@ -5,7 +5,9 @@ project has the background needed to work on it safely. Read this before
 making changes. It reflects the state as of 2026-09-22 (updated same-day for
 the client-data-isolation work — see "Client-level data isolation" below;
 further updated 2026-09-28 for the GA4 tag — see "Google Analytics (GA4)
-added to marketing page" below) — if things look different, trust the code
+added to marketing page" below; further updated 2026-10-02 for the design
+system pass — see "Design system applied to the marketing page" below) — if
+things look different, trust the code
 over this file and update this file.
 
 ## What this is
@@ -1029,6 +1031,63 @@ gating.
   there was no Content-Security-Policy to update.
 - Shipped on branch `feat/ga4-marketing-page`, verified on its Vercel
   preview, then fast-forward merged to `main`.
+
+## Design system applied to the marketing page (2026-10-02)
+
+The Judge D Show design system now exists as a Claude Design System
+artifact: https://claude.ai/artifact/2NCxYHs8o3fAtaAAXicdsL (tokens, README
+brand book, logo SVGs, previews for Button, Tag, Card, Field, ScoreCard,
+PinPad). A reference canvas with foundations, logo lockups, the icon set,
+motion and the print sign-off sheet is at
+https://claude.ai/artifact/DgJniq8UxcD4JaBsqvYP2o. Both are private to
+Kirt until shared. Values were lifted from `app/styles.css`,
+`icons/favicon.svg` and `app/src/print.js`; the hover/pressed ramp steps
+are derived (magenta `#A8004F` hover, `#8A0042` pressed; gold `#FFD878`
+hover, `#F0B52F` pressed).
+
+**Rules the system encodes (decided with Kirt, don't reopen without asking):**
+
+- **Shape.** Containers and controls (cards, tables, inputs, buttons,
+  modals, toasts) have radius 0. Pills, tags, mode tabs, the circular D
+  badge and the photo avatar are fully round. The app-icon tile is the one
+  rounded square. No in-between radii (this retires the old 8/10/14px).
+- **Contrast.** Magenta text/icons never on navy. Gold text/icons never on
+  cream or white. Fills are fine (magenta behind cream text, gold behind
+  navy text). This supersedes the older "gold ... or as a fill behind dark
+  text" wording in the brand-system table above for large cream-adjacent
+  bands.
+- **No shadows or gradients**, no literal Carnival imagery.
+- **Themes.** Light = cream ground, white surface, magenta accent. Dark =
+  navy ground, cream-at-6% surface, gold accent. Primary button: magenta
+  with cream text on light, gold with navy text on dark.
+
+**Marketing page changes (`index.html` only, shipped via
+`claude/laughing-albattani-3z40sl`, previewed on Vercel, then fast-forward
+merged to `main`):**
+
+- `border-radius` 8/10/14px -> 0 on buttons, cards, step tiles, the FAQ
+  "Show all" button; the demo-video card shadows removed.
+- New classes in the head `<style>`: `.jds-btn` (44px min height, 120ms
+  background transition), `.jds-btn-p` (magenta; hover `#A8004F`, active
+  `#8A0042`), `.jds-btn-s` (outline; hover/active ink tint), `.jds-btn-g`
+  (gold on navy; hover `#FFD878`, active `#F0B52F`). Hover rules use
+  `!important` because the buttons' colors are inline styles. Add the
+  class to any new button instead of re-inlining state styles.
+- Focus ring: 2px magenta, 2px offset, on all links and buttons; `.jds-dark`
+  sections (Why It's Different, closing CTA, footer) use a gold ring. Put
+  `jds-dark` on any new navy section.
+- The closing "Ready to see it in your judges' hands?" band moved from
+  gold (fill) to App Navy with a gold button, so gold no longer sits on
+  cream. It is the only gold button because it is the only button on navy.
+  Kirt chose to keep it gold. The footer gained a 12% cream top hairline so
+  the two navy bands read as separate.
+- Reduced-motion users get no button transition.
+
+**Not changed:** `/app` (`app/styles.css` still uses the older 10-14px
+radii and white-card shadows on the tally scoreboard); copy, layout, GA4,
+the print sheet (already matches the system). Applying the system to the
+judging app is a follow-up, and should wait until after a live event
+since the app is in use at real events.
 
 ## Copyright / ownership note
 
