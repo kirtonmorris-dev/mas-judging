@@ -78,6 +78,14 @@ export function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&'
 
 export function escapeAttr(s){ return escapeHtml(s); }
 
+// Admin contact checks -- mirror api/_lib/contactValidation.js (loose on purpose).
+export function isValidEmail(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+export function isValidPhone(s){
+  if(!/^[\d\s().+\-]+(?:\s*(?:ext\.?|x|#)\s*\d{1,6})?$/i.test(s)) return false;
+  const digits = s.replace(/\s*(?:ext\.?|x|#)\s*\d{1,6}$/i, '').replace(/\D/g, '');
+  return digits.length === 10 || (digits.length === 11 && digits[0] === '1');
+}
+
 // Sign-off print timestamps live in localStorage, not the DB -- this is
 // visibility only (was the sheet in this browser reprinted after an edit?),
 // never an enforcement mechanism, so it doesn't need to be authoritative
