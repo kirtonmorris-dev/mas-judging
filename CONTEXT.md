@@ -1131,6 +1131,37 @@ system itself; the app just doesn't use it.
 - Copy, layout, GA4 and the print sheet were not changed in either pass
   (the print sheet already matched the system).
 
+## Admin contact capture (2026-10-24)
+
+Client contacts are now required when adding or editing a client, and events
+can carry an optional event-day contact. All of it lives in the admin view
+only.
+
+- **Columns**: `events.event_contact_name`, `event_contact_email`,
+  `event_contact_phone` (nullable text). `clients.contact_*` already existed
+  and are still nullable (the 3 original rows are NULL). No NOT NULL or
+  CHECK was added; "required" is enforced in the admin form and in
+  `api/admin/create-client.js` / `update-client.js` (400 codes
+  `name_required`, `contact_name_required`, `contact_email_required|invalid`,
+  `contact_phone_required|invalid`). Shared checks: `api/_lib/contactValidation.js`
+  (loose email regex; US phone, 10 digits or 11 with leading 1, optional ext).
+- **New RPCs** (security definer, `search_path public`, service_role only):
+  `update_client_admin(p_id, p_name, p_contact_name, p_contact_email,
+  p_contact_phone)` and `update_event_contact_admin(p_event_id text, ...)`,
+  which writes only the three event contact columns, stores empty strings as
+  NULL, and raises `unknown_event` if the event doesn't exist.
+- **`create_event_admin`** is now one function with optional event contact
+  params. The old `(uuid, text)` and `(uuid, text, text)` overloads were
+  dropped in the same migration, since keeping them makes named-arg calls
+  ambiguous. `list_clients_admin` / `list_events_admin` now also return
+  `contactName/Email/Phone` and `eventContactName/Email/Phone`.
+- **Routes**: `api/admin/update-client.js`, `api/admin/update-event-contact.js`;
+  `create-event.js` forwards the optional event contact. "Edit client" and
+  "Edit event" in `views/admin.js`; Edit event touches only the contact fields.
+- **Admin only**: contact fields are not in `get_event_config`,
+  `replace_event_config`, or anything judge/organizer sessions call. RLS and
+  anon grants were not changed. Migration: `scripts/migrations/2026-10-24_admin_contacts.sql`.
+
 ## Copyright / ownership note
 
 Footer and JS header comment: "© 2026 Immortelle Advisory Group. Built by

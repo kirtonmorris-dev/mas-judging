@@ -407,12 +407,23 @@ export async function adminDeleteClient(token, clientId){
   return adminApi('delete-client', { token, clientId });
 }
 
-export async function adminCreateClient(token, name){
-  return adminApi('create-client', { token, name });
+// fields: { name, contactName, contactEmail, contactPhone }
+export async function adminCreateClient(token, fields){
+  return adminApi('create-client', { token, ...fields });
 }
 
-export async function adminCreateEvent(token, clientId, name, slug){
-  return adminApi('create-event', { token, clientId, name, slug });
+export async function adminUpdateClient(token, clientId, fields){
+  return adminApi('update-client', { token, clientId, ...fields });
+}
+
+// contact (optional): { eventContactName, eventContactEmail, eventContactPhone }
+export async function adminCreateEvent(token, clientId, name, slug, contact){
+  return adminApi('create-event', { token, clientId, name, slug, ...(contact || {}) });
+}
+
+// Edits only the three event-day contact fields; empty string clears to NULL.
+export async function adminUpdateEventContact(token, eventId, contact){
+  return adminApi('update-event-contact', { token, eventId, ...contact });
 }
 
 export async function adminResetOrganizerPin(token, eventId){
