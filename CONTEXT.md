@@ -879,15 +879,14 @@ can re-verify it; if it stops working the UI drops back to the PIN gate. The
 when the closed flag changes, so a judge mid-score sees the banner within one
 cycle without losing inputs.
 
-**Grants** (phase 2): drops the anon `INSERT/UPDATE/DELETE` policies on
+**Grants** (phase 2, applied; see "Rollout status" below): drops the anon `INSERT/UPDATE/DELETE` policies on
 `scores` and `INSERT` on `score_history` and revokes the matching table grants
 from `anon`/`authenticated`/`public`. `SELECT` stays (tally, Judge Detail, print
-all read directly). **Run phase 2 only after the new client is live on main and
-verified, and when no event is live**: any browser still running the old
-JavaScript (a judge's phone with a tab left open) writes by direct REST and will
-fail with "Save failed" until reloaded. Rollback SQL is in the phase 2 file.
-Until phase 2 runs, the close is enforced for every client that uses the RPCs but
-a stale tab or a script can still write directly.
+all read directly). **Phase 2 had to wait for the new client to be live and no event to be live**:
+any browser still running the old JavaScript (a judge's phone with a tab left
+open) writes by direct REST and fails with "Save failed" until reloaded. Rollback SQL is in the phase 2 file.
+With phase 2 applied, the RPCs are the only way to write a score, so the close
+holds for every caller.
 
 **Rollout status (2026-10-25)**:
 - **Phase 1 is applied** to the shared project (`pjqojhtqxljnukwlzekr`, migration
@@ -896,9 +895,20 @@ a stale tab or a script can still write directly.
   the five RPCs, only service_role can call `reopen_event_scoring_admin` and
   `list_events_admin`), function bodies, and `get_event_config` for the live NYC
   event unchanged apart from `scoringClosedAt: null` (no `pin` key).
-- **Phase 2 is NOT applied.** Anon can still write `scores`/`score_history` directly,
-  so the close is not airtight against a stale tab or a script yet. Run it only
-  after the new client is live on main and no event is live.
+- **Phase 2 is APPLIED** (run in the Supabase SQL editor 2026-10-25, after the new
+  client was READY on production as `897afe4` and no event was live: no score write
+  for weeks). Verified afterward: the only policies left on `scores`/`score_history`
+  are the two `public read` SELECT ones; anon holds `SELECT` only (no insert, update,
+  delete or truncate), `authenticated` has no write access, RLS is still on, and the
+  score and history row counts were unchanged. As the real `anon` role, in a
+  rolled-back transaction, direct INSERT/UPDATE/DELETE on both tables fail with
+  "permission denied", reads work, and `submit_judge_score`, `organizer_correct_score`,
+  `retract_judge_score` and `close_event_scoring` still work, with submit refused
+  once closed. So the lock now holds against stale tabs and scripts, not only
+  against the new client. Browsers still on the old JavaScript fail to save until
+  reloaded. Rollback SQL is at the top of the phase 2 migration file.
+- The browser, on production, was not exercised end to end after the merge; the
+  preview deploy (same code, same database) was clicked through by hand before it.
 - **Tested** on a scratch event on the real project (since deleted) through the
   preview deploy by hand, plus a 26-case run as the `anon` role inside a rolled-back
   transaction (permissions, closed-event refusals, reason rules, organizer lockout
