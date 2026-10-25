@@ -777,13 +777,22 @@ old client does first login that way; phase 2 removes that.
 for "No PIN"/"PIN set" and the Set-your-PIN screen, and strips any `pin` field
 on load.
 
-**Phase 2** (`scripts/migrations/2026-10-25_pin_rate_limiting_phase2_retire_legacy.sql`)
-removes `pin` from `get_event_config`, stops honoring payload `pin`, and drops
-`check_event_organizer_pin`. **Until phase 2 is applied, the hole is only half
-closed**: anyone with an event id can still read judge PINs from
-`get_event_config` and still brute-force the organizer PIN through the legacy
-RPC. Apply it outside a live event and after judges/organizers reload (old
-open tabs call the dropped RPC and expect `pin` in the config).
+**Phase 2 -- applied 2026-10-25** (`scripts/migrations/2026-10-25_pin_rate_limiting_phase2_retire_legacy.sql`,
+run in the Supabase SQL editor after the new client was READY on production).
+`get_event_config` no longer returns `pin` (only `hasPin`), `replace_event_config`
+no longer honors a payload `pin` at all (PINs change only via
+`set_judge_first_pin` while null, or an explicit `resetPin:true`), and
+`check_event_organizer_pin` is dropped. Verified afterward: no `pin` key or PIN
+digits in `get_event_config` output, legacy RPC absent, anon denied on
+`pin_attempts` and `pin_attempt_register`, every event's judge-PIN fingerprint
+unchanged. Browser tabs opened before the deploy break on reload-less use of
+the PIN screens (they call the dropped RPC); have them reload.
+
+**Not yet verified end to end** (no browser/Supabase egress from the build
+sandbox): a real browser click-through, admin Unlock via `/api/admin/unlock-pin`,
+`resetPin` after phase 2, and a parallel-burst concurrency test. The limiter's
+row-lock design and the lockout/isolation/first-login/PIN-preservation cases
+were verified with SQL as `anon` on the sandbox event.
 
 **Known limits, not solved here**:
 - `replace_event_config`, `delete_event_own` and the `scores`/`score_history`
