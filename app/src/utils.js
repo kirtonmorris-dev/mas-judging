@@ -149,3 +149,16 @@ export function rankContestants(ev, cat, contestants, judges){
   });
   return rows;
 }
+
+// Message for a PIN check that did not pass. `result` is the jsonb the
+// check_*_pin RPCs return ({locked, retryAfterSeconds, attemptsLeft}); `hint`
+// is the existing "who to ask" sentence for that screen.
+export function pinFailMessage(result, hint){
+  if(result && result.locked){
+    const mins = Math.max(1, Math.ceil((result.retryAfterSeconds || 300) / 60));
+    return `Too many attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`;
+  }
+  const left = result && Number.isInteger(result.attemptsLeft) ? result.attemptsLeft : null;
+  const leftText = left === null ? '' : ` ${left} attempt${left === 1 ? '' : 's'} left.`;
+  return `Incorrect PIN.${leftText} ${hint}`;
+}

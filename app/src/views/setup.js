@@ -10,7 +10,7 @@ export function renderSetup(ev){
   html += renderCompetitionSettings(ev);
   html += '<div class="card"><div class="section-title" style="color:var(--ink); margin:0 0 12px;">Judges — ' + escapeHtml(ev.name) + '</div><div class="chip-row">';
   ev.judges.forEach(j=>{
-    const hasPin = j.pin !== null && j.pin !== undefined;
+    const hasPin = !!j.hasPin;
     html += `<span class="chip"><b>${escapeHtml(j.name)}</b> <span style="color:var(--ink-soft); font-weight:400;">(${escapeHtml(j.realName||j.name)})</span>
       <span class="pinflag ${hasPin?'set':'unset'}">${hasPin?'PIN set':'No PIN'}</span>
       ${hasPin?`<button class="reset" data-reset-pin="${escapeAttr(j.name)}">reset</button>`:''}

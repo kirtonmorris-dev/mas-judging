@@ -6,7 +6,7 @@
 // (see api.js's adminListEvents/adminListClients/adminCreateEvent, all
 // separate RPCs from the event-scoped ones those views use) -- so there is
 // no flag anywhere that widens a normal session's access into this one.
-import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, adminResetOrganizerPin, adminUpdateClient, adminUpdateEventContact, deleteEventOwn } from '../api.js';
+import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, adminResetOrganizerPin, adminUnlockPins, adminUpdateClient, adminUpdateEventContact, deleteEventOwn } from '../api.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -149,6 +149,9 @@ export function renderAdmin(){
       events.forEach(ev=>{
         html += `<div class="contestant-item" style="cursor:default;">
           <div class="info"><b>${escapeHtml(ev.name)}</b><span>${ev.slug ? escapeHtml(ev.slug) : '(no slug set)'} &middot; ${ev.active ? 'active' : 'inactive'} &middot; Organizer PIN: <b data-organizer-pin-for="${escapeAttr(ev.id)}">${escapeHtml(ev.organizerPin || '?')}</b></span>${
+            (ev.lockedTargets && ev.lockedTargets.length)
+              ? `<span data-lock-indicator-for="${escapeAttr(ev.id)}" style="color:var(--danger); font-weight:600;">Locked out: ${ev.lockedTargets.map(t=>escapeHtml(t === 'organizer' ? 'Organizer' : t.replace(/^judge:/, ''))).join(', ')}</span>` : ''
+          }${
             (ev.eventContactName || ev.eventContactEmail || ev.eventContactPhone)
               ? `<span>Event-day contact: ${contactLine([ev.eventContactName, ev.eventContactEmail, ev.eventContactPhone])}</span>` : ''
           }</div>
@@ -157,6 +160,7 @@ export function renderAdmin(){
             <button class="btn btn-outline btn-small" data-copy-link="${escapeAttr(linkFor(ev,'organizer'))}">Organizer link</button>
             <button class="btn btn-outline btn-small" data-edit-event="${escapeAttr(ev.id)}">Edit event</button>
             <button class="btn btn-outline btn-small" data-reset-organizer-pin="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Reset PIN</button>
+            <button class="btn btn-outline btn-small" data-unlock-pins="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Unlock</button>
             <button class="btn-danger-quiet" data-remove-event="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Remove</button>
           </span>
         </div>
@@ -319,6 +323,10 @@ export function attachAdminHandlers(){
         showToast(`New organizer PIN for "${eventName}": ${pin}`);
         btn.disabled = false;
         btn.textContent = 'Reset PIN';
+        // The reset also cleared the organizer lockout server-side: drop it from the indicator.
+        if(ev && ev.lockedTargets && ev.lockedTargets.includes('organizer')){
+          await loadAdminData();
+        }
       }catch(e){
         if(handleAdminAuthError(e)) return;
         console.error('reset organizer pin failed', e);
@@ -326,6 +334,29 @@ export function attachAdminHandlers(){
         btn.disabled = false;
         btn.textContent = 'Reset PIN';
       }
+    };
+  });
+
+  document.querySelectorAll('[data-unlock-pins]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const eventId = btn.getAttribute('data-unlock-pins');
+      const eventName = btn.getAttribute('data-event-name');
+      btn.disabled = true;
+      btn.textContent = 'Unlocking…';
+      try{
+        await adminUnlockPins(state.adminToken, eventId);
+        const ev = state.adminEvents.find(e=>e.id===eventId);
+        if(ev) ev.lockedTargets = [];
+        const indicator = document.querySelector(`[data-lock-indicator-for="${eventId}"]`);
+        if(indicator) indicator.remove();
+        showToast(`PIN lockouts cleared for "${eventName}"`);
+      }catch(e){
+        if(handleAdminAuthError(e)) return;
+        console.error('unlock pins failed', e);
+        alert('Could not unlock — check connection.');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
     };
   });
 

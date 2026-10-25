@@ -26,17 +26,34 @@ export async function resolveEventSlug(slug){
   return await res.json();
 }
 
-// Per-event organizer PIN check -- replaced the old shared ORG_PIN constant
-// comparison. Safe to call with the anon key: this RPC never returns the
-// real PIN, only true/false (see the per_event_organizer_pin migration).
-export async function checkOrganizerPin(eventId, pin){
-  const res = await fetch(`${REST}/rpc/check_event_organizer_pin`, {
+async function rpcJson(fn, body){
+  const res = await fetch(`${REST}/rpc/${fn}`, {
     method: 'POST',
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_event_id: eventId, p_pin: pin })
+    body: JSON.stringify(body)
   });
-  if(!res.ok) throw new Error('Supabase check_event_organizer_pin failed: ' + res.status);
+  if(!res.ok) throw new Error(`Supabase ${fn} failed: ` + res.status);
   return await res.json();
+}
+
+// PIN checks are server-side and rate limited: 5 wrong guesses lock that
+// target (the organizer PIN, or one judge slot) for 5 minutes, per event --
+// see the pin_rate_limiting migration. Each returns
+// { ok, locked, retryAfterSeconds, attemptsLeft }; checkJudgePin can also
+// return noPin:true (judge has not set a PIN yet) or unknown:true. The real
+// PIN is never sent to the browser.
+export async function checkOrganizerPin(eventId, pin){
+  return rpcJson('check_organizer_pin_v2', { p_event_id: eventId, p_pin: pin });
+}
+
+export async function checkJudgePin(eventId, slot, pin){
+  return rpcJson('check_judge_pin', { p_event_id: eventId, p_slot: slot, p_pin: pin });
+}
+
+// First login only: succeeds while the judge's PIN is still null.
+// Returns { ok:true } or { ok:false, error: invalid_pin|pin_already_set|unknown_judge }.
+export async function setJudgeFirstPin(eventId, slot, pin){
+  return rpcJson('set_judge_first_pin', { p_event_id: eventId, p_slot: slot, p_pin: pin });
 }
 
 async function fetchEventConfig(eventId){
@@ -219,6 +236,9 @@ export async function loadAll(){
     return;
   }
 
+  // Judge PINs are checked server-side; never keep one in client state even
+  // while the server still includes it during the rollout.
+  (ev.judges || []).forEach(j=>{ delete j.pin; });
   const cfg = normalizeConfig({ events: [ev], _rev: ev._rev ?? 0 });
   state.config = cfg;
 
@@ -428,4 +448,9 @@ export async function adminUpdateEventContact(token, eventId, contact){
 
 export async function adminResetOrganizerPin(token, eventId){
   return adminApi('reset-organizer-pin', { token, eventId });
+}
+
+// Clears the organizer lockout and every judge lockout for one event.
+export async function adminUnlockPins(token, eventId){
+  return adminApi('unlock-pin', { token, eventId });
 }

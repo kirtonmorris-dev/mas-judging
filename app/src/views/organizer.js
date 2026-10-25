@@ -5,7 +5,7 @@ import { render } from '../main.js';
 import { printAllSignoffSheets, printBlankSheets, printSignoffSheet } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, setTallyView, uid } from '../utils.js';
+import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, pinFailMessage, setTallyView, uid } from '../utils.js';
 import { renderJudgeDetail } from '../views/judgeDetail.js';
 import { attachCategoryCardHandlers, attachCompetitionSettingsHandlers, renderCategoryCards, renderSetup } from '../views/setup.js';
 import { renderEventPicker } from '../views/shared.js';
@@ -36,10 +36,10 @@ export function attachPinHandlers(){
     submitBtn.disabled = true;
     submitBtn.textContent = 'Checking…';
     try{
-      const ok = await checkOrganizerPin(ev.id, val);
-      if(ok){ state.orgUnlocked = true; render(); }
+      const res = await checkOrganizerPin(ev.id, val);
+      if(res.ok){ state.orgUnlocked = true; render(); }
       else {
-        errEl.textContent = 'Incorrect PIN. Ask Kirt for the organizer PIN.';
+        errEl.textContent = pinFailMessage(res, 'Ask Kirt for the organizer PIN.');
         errEl.style.display = 'block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Unlock';
@@ -258,7 +258,7 @@ export function attachOrganizerHandlers(){
     const nums = ev.judges.map(j=>{ const m = /^Judge\s+(\d+)$/i.exec(j.name||''); return m ? parseInt(m[1],10) : 0; });
     const nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
     const maskedName = 'Judge ' + nextNum;
-    ev.judges.push({name: maskedName, realName, pin:null});
+    ev.judges.push({name: maskedName, realName, hasPin:false});
     await saveConfig();
     render();
   };
@@ -296,7 +296,7 @@ export function attachOrganizerHandlers(){
         const norm = realName.toLowerCase();
         if(existing.has(norm) || seenInFile.has(norm)){ duplicates++; return; }
         seenInFile.add(norm);
-        ev.judges.push({name: 'Judge ' + nextNum, realName, pin:null});
+        ev.judges.push({name: 'Judge ' + nextNum, realName, hasPin:false});
         nextNum++;
         added++;
       });
@@ -349,7 +349,15 @@ export function attachOrganizerHandlers(){
     el.onclick = async ()=>{
       const name = el.getAttribute('data-reset-pin');
       const judgeObj = ev.judges.find(j=>j.name===name);
-      if(judgeObj){ judgeObj.pin = null; await saveConfig(); render(); showToast(`PIN reset for ${name}`); }
+      if(judgeObj){
+        // Explicit reset signal: replace_event_config keeps every stored PIN
+        // unless the judge carries resetPin:true (which also clears that
+        // judge's lockout). Kept until the save succeeds so a Retry re-sends it.
+        judgeObj.resetPin = true;
+        const ok = await saveConfig();
+        if(ok){ delete judgeObj.resetPin; judgeObj.hasPin = false; showToast(`PIN reset for ${name}`); }
+        render();
+      }
     };
   });
 
