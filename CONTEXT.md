@@ -729,13 +729,74 @@ gate itself didn't distinguish clients.
   Organizer tab, and a newly-created event gets a distinct random PIN that
   the old shared PIN does not unlock. Both confirmed directly by Kirt in
   production, not just on a preview deploy.
-- **Known, accepted limitation, not fixed here**: `check_event_organizer_pin`
-  has no rate limiting or lockout — a script could brute-force a 4-digit PIN
-  against a known event id in well under a minute. Same risk class as the
-  judge PIN check, which has always worked this way. Worth hardening (e.g.
-  an attempt-count column + short lockout) before this handles a client
-  whose organizer PIN protects something more sensitive than tally
-  visibility, but not done as part of this fix — flagged, not solved.
+- **Rate limiting added 2026-10-25** (was a known, accepted gap here) -- see
+  "PIN rate limiting" below. `check_event_organizer_pin` is the legacy,
+  unthrottled RPC; it is replaced by `check_organizer_pin_v2`.
+
+## PIN rate limiting (2026-10-25)
+
+**Policy**: 5 failed attempts, then a 5-minute lockout, tracked per event and
+per target (`organizer`, or `judge:<slot>` such as `judge:Judge 2`). A correct
+PIN resets that target's count. While locked, even the correct PIN is refused.
+When a lockout expires the target gets a fresh 5 attempts. No decay for old
+failures: only a correct PIN (or Unlock/reset) clears the count.
+
+**Schema/RPCs** (migration `scripts/migrations/2026-10-25_pin_rate_limiting.sql`,
+phase 1, additive):
+- `pin_attempts(event_id, target, failed_count, locked_until, last_failure_at)`,
+  PK `(event_id, target)`, FK to `events` with cascade. RLS on, no policies, no
+  grants for anon/authenticated; only the security definer functions touch it.
+- `pin_attempt_register(event_id, target, matched)` -- internal limiter, no
+  role can execute it directly. Creates the row if missing, then `SELECT ... FOR
+  UPDATE`, so concurrent guesses are serialized. It never RAISEs after counting
+  (that would roll the count back); it returns jsonb.
+- `check_organizer_pin_v2(p_event_id, p_pin)`, `check_judge_pin(p_event_id,
+  p_slot, p_pin)` -- anon-callable, return `{ok, locked, retryAfterSeconds,
+  attemptsLeft}`. Judge also returns `noPin:true` (nothing counted) or
+  `unknown:true` (no such slot/event; nothing tracked).
+- `set_judge_first_pin(p_event_id, p_slot, p_pin)` -- anon-callable; one atomic
+  `UPDATE ... WHERE pin IS NULL`. Returns `{ok}` or `{ok:false, error}` with
+  `invalid_pin | pin_already_set | unknown_judge`. It no longer goes through
+  `saveConfig`, so it also stops bumping `events.rev`.
+- `unlock_event_pins_admin(p_event_id)` -- service_role only; deletes every
+  `pin_attempts` row for the event. Route: `api/admin/unlock-pin.js`; button
+  "Unlock" next to "Reset PIN" in `views/admin.js`. `list_events_admin` now
+  returns `lockedTargets`, shown as a red "Locked out: ..." line on the event.
+- `reset_event_organizer_pin` also clears the organizer lockout.
+
+**`replace_event_config` PIN-preservation rule** (judges are still deleted and
+re-inserted on every save, so stored PINs are snapshotted by slot first):
+a judge's stored PIN is kept regardless of the payload (omitted, null, or a
+different value). A judge object carrying `"resetPin": true` gets PIN NULL and
+its lockout row cleared (`setup` Reset button sets that flag and deletes it
+once the save succeeds, so a Retry re-sends it). Lockout rows for slots that no
+longer exist are deleted. During rollout (phase 1 only) a well-formed 4-digit
+payload `pin` is still honored for a slot whose stored PIN is null, because the
+old client does first login that way; phase 2 removes that.
+`get_event_config` now also returns `hasPin` per judge; the client uses it
+for "No PIN"/"PIN set" and the Set-your-PIN screen, and strips any `pin` field
+on load.
+
+**Phase 2** (`scripts/migrations/2026-10-25_pin_rate_limiting_phase2_retire_legacy.sql`)
+removes `pin` from `get_event_config`, stops honoring payload `pin`, and drops
+`check_event_organizer_pin`. **Until phase 2 is applied, the hole is only half
+closed**: anyone with an event id can still read judge PINs from
+`get_event_config` and still brute-force the organizer PIN through the legacy
+RPC. Apply it outside a live event and after judges/organizers reload (old
+open tabs call the dropped RPC and expect `pin` in the config).
+
+**Known limits, not solved here**:
+- `replace_event_config`, `delete_event_own` and the `scores`/`score_history`
+  tables are still anon-callable with only an event id, so a script can bypass
+  both PIN screens (e.g. write scores as any judge slot, or reset a judge via
+  `resetPin` then claim the slot). The rate limit stops guessing in the UI/RPC,
+  not a determined caller who knows an event id. Real fix: authenticate those
+  writes (e.g. organizer PIN or a short-lived token on `replace_event_config`).
+- PINs are plaintext (`judges.pin`, `events.organizer_pin`); hashing is a
+  follow-up. 4-digit PINs at 5 tries/5 min still allow ~1,400 guesses/day per
+  target; progressive backoff would tighten that.
+- A lockout can be triggered on purpose by anyone who knows an event id
+  (nuisance DoS on event night); Admin Unlock is the remedy.
 
 ## Score history audit log now awaited, not fire-and-forget (2026-09-27)
 
@@ -779,9 +840,9 @@ resubmitted entry. Confirmed directly by Kirt on the preview before merge.
   isn't enforced at the DB layer now (the RLS lockdown migration is done —
   `events`/`judges`/`categories`/`contestants` are anon-inaccessible
   directly, and the old whole-database RPCs are dropped).
-- Per-event organizer PINs shipped 2026-09-24 (see "Per-event organizer
-  PIN" above) — no rate limiting/lockout on the PIN check, same as the
-  judge PIN, flagged there as an accepted gap, not fixed.
+- Per-event organizer PINs shipped 2026-09-24; PIN rate limiting shipped
+  2026-10-25 (see "PIN rate limiting" below). Still no hashing of stored PINs
+  and no per-user login.
 
 ## Brand system (Direction 1a) — applied 2026-09-27
 
@@ -1130,6 +1191,37 @@ system itself; the app just doesn't use it.
 
 - Copy, layout, GA4 and the print sheet were not changed in either pass
   (the print sheet already matched the system).
+
+## Admin contact capture (2026-10-24)
+
+Client contacts are now required when adding or editing a client, and events
+can carry an optional event-day contact. All of it lives in the admin view
+only.
+
+- **Columns**: `events.event_contact_name`, `event_contact_email`,
+  `event_contact_phone` (nullable text). `clients.contact_*` already existed
+  and are still nullable (the 3 original rows are NULL). No NOT NULL or
+  CHECK was added; "required" is enforced in the admin form and in
+  `api/admin/create-client.js` / `update-client.js` (400 codes
+  `name_required`, `contact_name_required`, `contact_email_required|invalid`,
+  `contact_phone_required|invalid`). Shared checks: `api/_lib/contactValidation.js`
+  (loose email regex; US phone, 10 digits or 11 with leading 1, optional ext).
+- **New RPCs** (security definer, `search_path public`, service_role only):
+  `update_client_admin(p_id, p_name, p_contact_name, p_contact_email,
+  p_contact_phone)` and `update_event_contact_admin(p_event_id text, ...)`,
+  which writes only the three event contact columns, stores empty strings as
+  NULL, and raises `unknown_event` if the event doesn't exist.
+- **`create_event_admin`** is now one function with optional event contact
+  params. The old `(uuid, text)` and `(uuid, text, text)` overloads were
+  dropped in the same migration, since keeping them makes named-arg calls
+  ambiguous. `list_clients_admin` / `list_events_admin` now also return
+  `contactName/Email/Phone` and `eventContactName/Email/Phone`.
+- **Routes**: `api/admin/update-client.js`, `api/admin/update-event-contact.js`;
+  `create-event.js` forwards the optional event contact. "Edit client" and
+  "Edit event" in `views/admin.js`; Edit event touches only the contact fields.
+- **Admin only**: contact fields are not in `get_event_config`,
+  `replace_event_config`, or anything judge/organizer sessions call. RLS and
+  anon grants were not changed. Migration: `scripts/migrations/2026-10-24_admin_contacts.sql`.
 
 ## Copyright / ownership note
 

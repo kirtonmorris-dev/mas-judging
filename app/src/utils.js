@@ -78,6 +78,14 @@ export function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&'
 
 export function escapeAttr(s){ return escapeHtml(s); }
 
+// Admin contact checks -- mirror api/_lib/contactValidation.js (loose on purpose).
+export function isValidEmail(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+export function isValidPhone(s){
+  if(!/^[\d\s().+\-]+(?:\s*(?:ext\.?|x|#)\s*\d{1,6})?$/i.test(s)) return false;
+  const digits = s.replace(/\s*(?:ext\.?|x|#)\s*\d{1,6}$/i, '').replace(/\D/g, '');
+  return digits.length === 10 || (digits.length === 11 && digits[0] === '1');
+}
+
 // Sign-off print timestamps live in localStorage, not the DB -- this is
 // visibility only (was the sheet in this browser reprinted after an edit?),
 // never an enforcement mechanism, so it doesn't need to be authoritative
@@ -140,4 +148,17 @@ export function rankContestants(ev, cat, contestants, judges){
     return b.total - a.total;
   });
   return rows;
+}
+
+// Message for a PIN check that did not pass. `result` is the jsonb the
+// check_*_pin RPCs return ({locked, retryAfterSeconds, attemptsLeft}); `hint`
+// is the existing "who to ask" sentence for that screen.
+export function pinFailMessage(result, hint){
+  if(result && result.locked){
+    const mins = Math.max(1, Math.ceil((result.retryAfterSeconds || 300) / 60));
+    return `Too many attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`;
+  }
+  const left = result && Number.isInteger(result.attemptsLeft) ? result.attemptsLeft : null;
+  const leftText = left === null ? '' : ` ${left} attempt${left === 1 ? '' : 's'} left.`;
+  return `Incorrect PIN.${leftText} ${hint}`;
 }

@@ -1,9 +1,9 @@
-import { saveConfig, saveScoreEntry, saveScoresMerge } from '../api.js';
+import { checkJudgePin, saveScoreEntry, saveScoresMerge, setJudgeFirstPin } from '../api.js';
 import { render } from '../main.js';
 import { printMyScores } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, draftHasUnsavedWork, entityLabel, escapeAttr, escapeHtml, judgeCategories, scoreKey, sortContestants } from '../utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, draftHasUnsavedWork, entityLabel, escapeAttr, escapeHtml, judgeCategories, pinFailMessage, scoreKey, sortContestants } from '../utils.js';
 import { renderEventPicker } from '../views/shared.js';
 
 export function renderJudgeMode(){
@@ -32,7 +32,7 @@ export function renderJudgeMode(){
   const judgeObj = currentJudgeObj(ev);
   if(!judgeObj) return html + '<div class="empty">That judge is no longer on this event.</div>';
 
-  if(judgeObj.pin === null || judgeObj.pin === undefined){
+  if(!judgeObj.hasPin){
     html += `<div class="card">
       <div class="section-title" style="color:var(--ink);">Set your PIN</div>
       <div class="pin-explain">Create a 4-digit PIN for <b>${escapeHtml(judgeObj.name)}</b>. You'll enter it each time you pick this name, so no one accidentally scores as you.</div>
@@ -49,7 +49,7 @@ export function renderJudgeMode(){
       <div class="pin-explain">Scoring as <b>${escapeHtml(judgeObj.name)}</b>.</div>
       <input type="tel" inputmode="numeric" maxlength="4" id="pinCheckInput" placeholder="4-digit PIN" style="text-align:center; letter-spacing:0.4em; font-size:1.3rem;">
       <button class="btn btn-primary" id="pinCheckBtn">Unlock</button>
-      <div id="pinCheckErr" class="err" style="display:none; margin-top:10px;">Wrong PIN. Ask the organizer to reset it if you forgot.</div>
+      <div id="pinCheckErr" class="err" style="display:none; margin-top:10px;"></div>
     </div>`;
     return html;
   }
@@ -153,23 +153,62 @@ export function attachJudgeHandlers(){
   if(pinSetBtn) pinSetBtn.onclick = async ()=>{
     const val = document.getElementById('pinSetInput').value.trim();
     const errEl = document.getElementById('pinSetErr');
-    if(!/^\d{4}$/.test(val)){ errEl.style.display='block'; return; }
+    if(!/^\d{4}$/.test(val)){ errEl.textContent = 'Enter exactly 4 digits.'; errEl.style.display='block'; return; }
     const ev = currentEvent();
     const judgeObj = currentJudgeObj(ev);
-    judgeObj.pin = val;
-    await saveConfig();
-    state.judgeUnlocked = true;
-    render();
+    pinSetBtn.disabled = true;
+    try{
+      const res = await setJudgeFirstPin(ev.id, judgeObj.name, val);
+      if(res.ok){
+        judgeObj.hasPin = true;
+        state.judgeUnlocked = true;
+        render();
+        return;
+      }
+      if(res.error === 'pin_already_set'){
+        // Someone (this judge on another device) set it first: go to the normal PIN entry.
+        judgeObj.hasPin = true;
+        showToast('A PIN is already set for this judge. Enter it to continue.', true);
+        render();
+        return;
+      }
+      errEl.textContent = res.error === 'invalid_pin' ? 'Enter exactly 4 digits.' : 'Could not set the PIN. Ask the organizer.';
+      errEl.style.display = 'block';
+    }catch(e){
+      console.error('set judge pin failed', e);
+      errEl.textContent = 'Could not reach the server — check connection.';
+      errEl.style.display = 'block';
+    }
+    pinSetBtn.disabled = false;
   };
 
   const pinCheckBtn = document.getElementById('pinCheckBtn');
-  if(pinCheckBtn) pinCheckBtn.onclick = ()=>{
-    const val = document.getElementById('pinCheckInput').value.trim();
+  if(pinCheckBtn) pinCheckBtn.onclick = async ()=>{
+    const input = document.getElementById('pinCheckInput');
+    const val = input.value.trim();
     const ev = currentEvent();
     const judgeObj = currentJudgeObj(ev);
     const errEl = document.getElementById('pinCheckErr');
-    if(val === judgeObj.pin){ state.judgeUnlocked = true; render(); }
-    else { errEl.style.display='block'; }
+    errEl.style.display = 'none';
+    pinCheckBtn.disabled = true;
+    try{
+      const res = await checkJudgePin(ev.id, judgeObj.name, val);
+      if(res.ok){ state.judgeUnlocked = true; render(); return; }
+      if(res.noPin){
+        // The organizer reset this PIN since the page loaded: switch to "Set your PIN".
+        judgeObj.hasPin = false;
+        render();
+        return;
+      }
+      errEl.textContent = pinFailMessage(res, 'Ask the organizer to reset it if you forgot.');
+      errEl.style.display = 'block';
+      input.value = '';
+    }catch(e){
+      console.error('judge pin check failed', e);
+      errEl.textContent = 'Could not reach the server — check connection.';
+      errEl.style.display = 'block';
+    }
+    pinCheckBtn.disabled = false;
   };
 
   const catSel = document.getElementById('categorySelect');

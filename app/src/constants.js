@@ -37,7 +37,7 @@ export function cloneTemplate(){ return CRITERIA_TEMPLATE.map(c=>({...c})); }
 export function normalizeConfig(cfg){
   if(cfg._rev === undefined) cfg._rev = 0;
   (cfg.events||[]).forEach(ev=>{
-    ev.judges = (ev.judges||[]).map(j => typeof j === 'string' ? {name:j, realName:j, pin:null} : j);
+    ev.judges = (ev.judges||[]).map(j => typeof j === 'string' ? {name:j, realName:j, hasPin:false} : j);
     ev.judges.forEach(j=>{ if(typeof j.realName !== 'string' || !j.realName) j.realName = j.name; });
     // undefined = legacy data that predates this field -> default to 'mas'.
     // null = organizer explicitly chose "Custom / Unassigned" -> keep it.
