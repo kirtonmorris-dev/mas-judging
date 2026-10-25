@@ -13,7 +13,7 @@ export function renderEventPicker(isOrganizer){
 
   let html = `<div class="card"><label>Event</label><div style="font-weight:600; font-size:1.05rem;">${escapeHtml(ev.name)}</div>`;
 
-  if(isOrganizer){
+  if(isOrganizer && !ev.scoringClosedAt){
     html += `<div class="danger-zone">
         <div class="danger-zone-label">Danger zone</div>
         <button class="btn-danger-quiet" id="removeCurrentEventBtn">Remove this event</button>

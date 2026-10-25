@@ -1,9 +1,9 @@
-import { checkJudgePin, saveScoreEntry, saveScoresMerge, setJudgeFirstPin } from '../api.js';
+import { checkJudgePin, isJudgingClosed, saveScoreEntry, setJudgeFirstPin, undoScoreEntry } from '../api.js';
 import { render } from '../main.js';
 import { printMyScores } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, draftHasUnsavedWork, entityLabel, escapeAttr, escapeHtml, judgeCategories, pinFailMessage, scoreKey, sortContestants } from '../utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, currentEvent, currentJudgeObj, draftHasUnsavedWork, entityLabel, escapeAttr, escapeHtml, formatClosedAt, judgeCategories, pinFailMessage, scoreKey, sortContestants } from '../utils.js';
 import { renderEventPicker } from '../views/shared.js';
 
 export function renderJudgeMode(){
@@ -11,6 +11,10 @@ export function renderJudgeMode(){
   let html = renderEventPicker(false);
   const ev = currentEvent();
   if(!ev) return html + '<div class="empty">No events yet. Ask the organizer to add one.</div>';
+
+  if(isJudgingClosed()){
+    html += `<div class="closed-banner" role="status"><b>Judging is closed.</b> Scores can no longer be added or changed.<span>Closed ${escapeHtml(formatClosedAt(ev.scoringClosedAt))}</span></div>`;
+  }
 
   html += '<div class="card">';
   html += '<label>Your name</label>';
@@ -111,6 +115,8 @@ export function renderScoringCard(ev, cat, contestant){
   const draft = state.draft[key];
   const maxTotal = catMaxTotal(cat);
   const total = cat.criteria.reduce((s,c)=>s+(draft[c.key]||0),0);
+  const closed = isJudgingClosed();
+  const dis = closed ? ' disabled' : '';
 
   let html = `<button class="btn btn-outline btn-small" id="backToList" style="margin-bottom:12px;">&larr; Back to contestants</button>`;
   html += `<div class="card ticket">`;
@@ -125,14 +131,24 @@ export function renderScoringCard(ev, cat, contestant){
     html += `<div class="criterion">
       <div class="top"><span class="name">${escapeHtml(c.label||'(unnamed criterion)')}</span></div>
       <div class="score-input-row">
-        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="-1" aria-label="Decrease ${escapeAttr(c.label||'score')}">&minus;</button>
-        <input type="number" inputmode="numeric" min="0" max="${c.max}" value="${val}" data-crit="${c.key}" class="score-input">
-        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="1" aria-label="Increase ${escapeAttr(c.label||'score')}">&plus;</button>
+        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="-1" aria-label="Decrease ${escapeAttr(c.label||'score')}"${dis}>&minus;</button>
+        <input type="number" inputmode="numeric" min="0" max="${c.max}" value="${val}" data-crit="${c.key}" class="score-input"${dis}>
+        <button type="button" class="stepper-btn" data-crit="${c.key}" data-dir="1" aria-label="Increase ${escapeAttr(c.label||'score')}"${dis}>&plus;</button>
         <span class="score-max">out of ${c.max}</span>
       </div>
     </div>`;
   });
 
+  if(closed){
+    // Read-only: no submit bar. An unsubmitted draft stays in state.draft and
+    // stays visible here; it is just not saved.
+    const unsaved = draftHasUnsavedWork(key, cat);
+    html += `<div class="closed-note">${unsaved
+      ? 'Judging closed before you submitted. The values above were <b>not saved</b>.'
+      : 'Judging is closed. This is the score on record.'}</div>`;
+    html += `</div><div class="card"><div class="score-action-total" style="color:var(--ink);"><span class="score-action-label">Total</span> <b><span id="liveTotal">${total}</span> / ${maxTotal}</b></div></div>`;
+    return html;
+  }
   html += `</div>`;
   html += `<div class="score-bar-spacer"></div>`;
   html += `<div class="score-action-bar">
@@ -289,10 +305,7 @@ export function attachJudgeHandlers(){
     if(ok){
       const label = contestantTitle(cat, contestant);
       showToast('Score saved for ' + label, false, async ()=>{
-        const undone = await saveScoresMerge(latest=>{
-          if(previousEntry) latest[key] = previousEntry;
-          else delete latest[key];
-        });
+        const undone = await undoScoreEntry(key, previousEntry);
         if(undone){ showToast('Submission undone'); render(); }
       }, 'Undo');
       state.contestantId = null;

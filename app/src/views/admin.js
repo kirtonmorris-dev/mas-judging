@@ -6,11 +6,11 @@
 // (see api.js's adminListEvents/adminListClients/adminCreateEvent, all
 // separate RPCs from the event-scoped ones those views use) -- so there is
 // no flag anywhere that widens a normal session's access into this one.
-import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, adminResetOrganizerPin, adminUnlockPins, adminUpdateClient, adminUpdateEventContact, deleteEventOwn } from '../api.js';
+import { adminCreateClient, adminCreateEvent, adminDeleteClient, adminListClients, adminListEvents, adminLogin, adminReopenScoring, adminResetOrganizerPin, adminUnlockPins, adminUpdateClient, adminUpdateEventContact, deleteEventOwn } from '../api.js';
 import { render } from '../main.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { escapeAttr, escapeHtml, isValidEmail, isValidPhone } from '../utils.js';
+import { escapeAttr, escapeHtml, formatClosedAt, isValidEmail, isValidPhone } from '../utils.js';
 
 function linkFor(ev, mode){
   const url = new URL(location.href);
@@ -152,6 +152,9 @@ export function renderAdmin(){
             (ev.lockedTargets && ev.lockedTargets.length)
               ? `<span data-lock-indicator-for="${escapeAttr(ev.id)}" style="color:var(--danger); font-weight:600;">Locked out: ${ev.lockedTargets.map(t=>escapeHtml(t === 'organizer' ? 'Organizer' : t.replace(/^judge:/, ''))).join(', ')}</span>` : ''
           }${
+            ev.scoringClosedAt
+              ? `<span data-closed-indicator-for="${escapeAttr(ev.id)}" style="color:var(--ink); font-weight:600;">Judging closed ${escapeHtml(formatClosedAt(ev.scoringClosedAt))}</span>` : ''
+          }${
             (ev.eventContactName || ev.eventContactEmail || ev.eventContactPhone)
               ? `<span>Event-day contact: ${contactLine([ev.eventContactName, ev.eventContactEmail, ev.eventContactPhone])}</span>` : ''
           }</div>
@@ -161,6 +164,7 @@ export function renderAdmin(){
             <button class="btn btn-outline btn-small" data-edit-event="${escapeAttr(ev.id)}">Edit event</button>
             <button class="btn btn-outline btn-small" data-reset-organizer-pin="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Reset PIN</button>
             <button class="btn btn-outline btn-small" data-unlock-pins="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Unlock</button>
+            ${ev.scoringClosedAt ? `<button class="btn btn-outline btn-small" data-reopen-scoring="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Reopen judging</button>` : ''}
             <button class="btn-danger-quiet" data-remove-event="${escapeAttr(ev.id)}" data-event-name="${escapeAttr(ev.name)}">Remove</button>
           </span>
         </div>
@@ -300,7 +304,9 @@ export function attachAdminHandlers(){
         await loadAdminData();
       }catch(e){
         console.error('remove event failed', e);
-        alert('Could not remove event — check connection.');
+        alert(e && e.code === 'judging_closed'
+          ? 'Judging is closed for this event. Reopen judging first, then remove it.'
+          : 'Could not remove event — check connection.');
         btn.disabled = false;
         btn.textContent = 'Remove';
       }
@@ -333,6 +339,27 @@ export function attachAdminHandlers(){
         alert('Could not reset PIN — check connection.');
         btn.disabled = false;
         btn.textContent = 'Reset PIN';
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-reopen-scoring]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const eventId = btn.getAttribute('data-reopen-scoring');
+      const eventName = btn.getAttribute('data-event-name');
+      if(!confirm(`Reopen judging for "${eventName}"? Judges will be able to submit and change scores again, and setup unfreezes. The reopen is logged.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Reopening…';
+      try{
+        await adminReopenScoring(state.adminToken, eventId);
+        showToast(`Judging reopened for "${eventName}"`);
+        await loadAdminData();
+      }catch(e){
+        if(handleAdminAuthError(e)) return;
+        console.error('reopen scoring failed', e);
+        alert('Could not reopen judging — check connection.');
+        btn.disabled = false;
+        btn.textContent = 'Reopen judging';
       }
     };
   });

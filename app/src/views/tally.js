@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { contestantSubtitle, contestantTitle, escapeHtml, getLastPrintedAt, getTallyView, rankContestants, shortJudgeLabel } from '../utils.js';
+import { contestantSubtitle, contestantTitle, escapeHtml, formatClosedAt, getLastPrintedAt, getTallyView, rankContestants, shortJudgeLabel } from '../utils.js';
 
 // Last total rendered per event/category/contestant. When a render shows a
 // different total than the previous one (a judge just submitted or was
@@ -18,7 +18,11 @@ function totalChanged(scope, contestantId, total){
 export function renderTally(ev){
   if(ev.categories.length===0) return '<div class="empty">No categories yet for this event. Add one below.</div>';
 
-  let html = '<div class="card"><label>Category</label><select id="tallyCategorySelect">';
+  let html = '';
+  if(ev.scoringClosedAt){
+    html += `<div class="closed-line">Judging closed on ${escapeHtml(formatClosedAt(ev.scoringClosedAt))}. These totals are final unless corrected with a logged reason.</div>`;
+  }
+  html += '<div class="card"><label>Category</label><select id="tallyCategorySelect">';
   ev.categories.forEach(c=>{
     html += `<option value="${c.id}" ${state.categoryId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`;
   });
@@ -124,13 +128,17 @@ function renderHistoryPanel(eventId, cat){
   } else if(rows.length === 0){
     html += '<div class="small-note">No changes logged for this category yet.</div>';
   } else {
-    html += '<table><thead><tr><th>When</th><th>Entry</th><th>Judge</th><th>By</th><th>Total</th></tr></thead><tbody>';
+    html += '<table><thead><tr><th>When</th><th>Entry</th><th>Judge</th><th>By</th><th>Total</th><th>Reason</th></tr></thead><tbody>';
+    const totalOf = vals => cat.criteria.reduce((sum,c)=>sum+((vals||{})[c.key]||0),0);
     rows.forEach(r=>{
       const ct = cat.contestants.find(c=>c.id===r.contestant_id);
       const entryLabel = ct ? contestantTitle(cat, ct) : '(removed entry)';
-      const total = cat.criteria.reduce((sum,c)=>sum+((r.values||{})[c.key]||0),0);
-      const by = r.changed_by === 'organizer' ? 'Organizer correction' : 'Judge submission';
-      html += `<tr><td>${new Date(r.changed_at).toLocaleString()}</td><td>${escapeHtml(entryLabel)}</td><td>${escapeHtml(shortJudgeLabel(r.judge_slot))}</td><td>${by}</td><td class="num">${total}</td></tr>`;
+      const total = totalOf(r.values);
+      // Organizer corrections show old -> new; the reason is the one typed at the time.
+      const totalCell = (r.changed_by === 'organizer' && r.old_values) ? `${totalOf(r.old_values)} &rarr; ${total}` : String(total);
+      const by = r.changed_by === 'organizer' ? 'Organizer correction' : (r.changed_by === 'judge_undo' ? 'Judge undid submission' : 'Judge submission');
+      const why = r.changed_by === 'judge_undo' ? '' : (r.reason || '');
+      html += `<tr><td>${new Date(r.changed_at).toLocaleString()}</td><td>${escapeHtml(entryLabel)}</td><td>${escapeHtml(shortJudgeLabel(r.judge_slot))}</td><td>${by}</td><td class="num">${totalCell}</td><td>${escapeHtml(why)}</td></tr>`;
     });
     html += '</tbody></table>';
   }
