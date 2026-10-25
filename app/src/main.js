@@ -1,6 +1,6 @@
 /* Judge D Show — Live Scoring for Every Competition
    © 2026 Immortelle Advisory Group. Built by Kirt Morris, Founder & Principal Consultant. */
-import { fetchScores, loadAll, resolveEventSlug } from './api.js';
+import { fetchEventStatus, fetchScores, loadAll, resolveEventSlug } from './api.js';
 import { state } from './state.js';
 import { initConnectionBanner } from './ui.js';
 import { draftHasUnsavedWork } from './utils.js';
@@ -68,6 +68,19 @@ function startEventSession(){
   loadAll();
 
   setInterval(async ()=>{
+    // Closed/reopened flag rides along with the poll (one tiny RPC). Only a
+    // change re-renders, so a judge mid-score keeps their draft and inputs
+    // until the status actually flips.
+    const ev = state.config && state.config.events[0];
+    if(ev){
+      try{
+        const closedAt = await fetchEventStatus(state.eventId);
+        if((closedAt || null) !== (ev.scoringClosedAt || null)){
+          ev.scoringClosedAt = closedAt;
+          render();
+        }
+      }catch(e){ console.error('status poll failed', e); }
+    }
     const orgShouldRefresh = state.mode==='organizer' && state.orgUnlocked && (state.orgTab==='tally' || state.orgTab==='detail');
     const judgeShouldRefresh = state.mode==='judge' && state.judgeUnlocked && !state.contestantId;
     if(orgShouldRefresh || judgeShouldRefresh){

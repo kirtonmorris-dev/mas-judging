@@ -1,11 +1,11 @@
-import { checkOrganizerPin, deleteEventOwn, fetchOrganizerEditSummary, fetchScoreHistoryForCategory, saveConfig, saveOrganizerScoreEdit } from '../api.js';
+import { checkOrganizerPin, closeJudging, deleteEventOwn, fetchOrganizerEditSummary, fetchScoreHistoryForCategory, isJudgingClosed, saveConfig, saveOrganizerScoreEdit } from '../api.js';
 import { cloneTemplate } from '../constants.js';
 import { detectHeaderRowIndex, mapHeaderColumns } from '../importParsers.js';
 import { render } from '../main.js';
 import { printAllSignoffSheets, printBlankSheets, printSignoffSheet } from '../print.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, pinFailMessage, setTallyView, uid } from '../utils.js';
+import { catMaxTotal, currentEvent, escapeAttr, escapeHtml, formatClosedAt, pinFailMessage, setTallyView, uid } from '../utils.js';
 import { renderJudgeDetail } from '../views/judgeDetail.js';
 import { attachCategoryCardHandlers, attachCompetitionSettingsHandlers, renderCategoryCards, renderSetup } from '../views/setup.js';
 import { renderEventPicker } from '../views/shared.js';
@@ -37,7 +37,7 @@ export function attachPinHandlers(){
     submitBtn.textContent = 'Checking…';
     try{
       const res = await checkOrganizerPin(ev.id, val);
-      if(res.ok){ state.orgUnlocked = true; render(); }
+      if(res.ok){ state.orgUnlocked = true; state.orgPin = val; render(); }
       else {
         errEl.textContent = pinFailMessage(res, 'Ask Kirt for the organizer PIN.');
         errEl.style.display = 'block';
@@ -65,13 +65,56 @@ export function renderOrganizer(){
   html += `<span class="folder-tab ${state.orgTab==='detail'?'active':'inactive'}" data-org-tab="detail">Judge Detail</span>`;
   html += '</div>';
 
+  html += renderJudgingStatus(ev);
+
   if(state.orgTab === 'tally') html += renderTally(ev);
   else if(state.orgTab === 'detail') html += renderJudgeDetail(ev);
+  else if(isJudgingClosed()){
+    // Structure is frozen once judging closes (the server refuses
+    // replace_event_config too); a disabled fieldset greys out every control.
+    html += `<fieldset disabled class="frozen-setup">${renderSetup(ev)}</fieldset>`;
+  }
   else html += renderSetup(ev);
   return html;
 }
 
+// Close judging control while open; a status banner once closed. Corrections
+// after close still work from Judge Detail but ask for a reason. Only an admin
+// can reopen.
+function renderJudgingStatus(ev){
+  if(isJudgingClosed()){
+    return `<div class="closed-banner" role="status"><b>Judging closed</b> on ${escapeHtml(formatClosedAt(ev.scoringClosedAt))}. Judges can no longer submit or change scores, and setup is frozen. You can still correct a score from Judge Detail with a reason. Only an admin can reopen judging.</div>`;
+  }
+  return `<div class="card judging-open">
+      <div class="judging-open-row">
+        <div><b>Judging is open</b><div class="small-note">Judges can submit and edit scores.</div></div>
+        <button class="btn btn-outline btn-small" id="closeJudgingBtn">Close judging</button>
+      </div>
+    </div>`;
+}
+
 export function attachOrganizerHandlers(){
+  const closeJudgingBtn = document.getElementById('closeJudgingBtn');
+  if(closeJudgingBtn) closeJudgingBtn.onclick = async ()=>{
+    const ev = currentEvent();
+    if(!ev) return;
+    if(!confirm(`Close judging for ${ev.name}? Judges will no longer be able to submit or change scores.`)) return;
+    closeJudgingBtn.disabled = true;
+    closeJudgingBtn.textContent = 'Closing\u2026';
+    try{
+      const res = await closeJudging();
+      if(res.ok){
+        showToast(res.alreadyClosed ? 'Judging was already closed' : 'Judging closed');
+        render();
+      }
+    }catch(e){
+      console.error('close judging failed', e);
+      showToast('Could not close judging \u2014 check connection', true);
+      closeJudgingBtn.disabled = false;
+      closeJudgingBtn.textContent = 'Close judging';
+    }
+  };
+
   const removeEventBtn = document.getElementById('removeCurrentEventBtn');
   if(removeEventBtn) removeEventBtn.onclick = async ()=>{
     const ev = currentEvent();
@@ -84,7 +127,9 @@ export function attachOrganizerHandlers(){
       document.getElementById('app').innerHTML = '<div class="empty">This event has been removed. Ask your admin for a new link.</div>';
     }catch(e){
       console.error('delete event failed', e);
-      showToast('Could not remove event \u2014 check connection', true);
+      showToast(e && e.code === 'judging_closed'
+        ? 'Judging is closed, so this event cannot be removed. Ask your admin.'
+        : 'Could not remove event \u2014 check connection', true);
       removeEventBtn.disabled = false;
       removeEventBtn.textContent = 'Remove this event';
     }
@@ -222,9 +267,17 @@ export function attachOrganizerHandlers(){
     document.querySelectorAll('[data-save-score-edit]').forEach(el=>{
       el.onclick = async ()=>{
         const key = el.getAttribute('data-save-score-edit');
+        let reason = null;
+        if(isJudgingClosed()){
+          reason = (prompt('Judging is closed. Why is this score being corrected? (at least two words)') || '').trim();
+          if(reason.length < 6 || !/\S+\s+\S+/.test(reason)){
+            showToast('A reason of at least two words is required to correct a score after judging closed.', true);
+            return;
+          }
+        }
         el.disabled = true;
         el.textContent = 'Saving…';
-        const ok = await saveOrganizerScoreEdit(key);
+        const ok = await saveOrganizerScoreEdit(key, reason);
         if(ok){
           delete state.orgEditDraft[key];
           state.orgEditKey = null;

@@ -26,13 +26,22 @@ export async function resolveEventSlug(slug){
   return await res.json();
 }
 
+// Error codes the database raises on purpose (see the close_judging migration).
+// Surfaced as err.code so callers can react without string-matching responses.
+const RPC_ERROR_CODES = ['judging_closed', 'reason_required', 'event_not_found', 'invalid_score'];
+
 async function rpcJson(fn, body){
   const res = await fetch(`${REST}/rpc/${fn}`, {
     method: 'POST',
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if(!res.ok) throw new Error(`Supabase ${fn} failed: ` + res.status);
+  if(!res.ok){
+    const text = await res.text().catch(()=>'');
+    const err = new Error(`Supabase ${fn} failed: ` + res.status);
+    err.code = RPC_ERROR_CODES.find(c => text.includes(c)) || null;
+    throw err;
+  }
   return await res.json();
 }
 
@@ -79,6 +88,11 @@ async function replaceEventConfig(eventId, eventData, expectedRev){
       err.code = 'config_rev_conflict';
       throw err;
     }
+    if(text.includes('judging_closed')){
+      const err = new Error('judging_closed');
+      err.code = 'judging_closed';
+      throw err;
+    }
     throw new Error('Supabase replace_event_config failed: ' + res.status);
   }
   return await res.json();
@@ -90,7 +104,12 @@ export async function deleteEventOwn(eventId){
     headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_event_id: eventId })
   });
-  if(!res.ok) throw new Error('Supabase delete_event_own failed: ' + res.status);
+  if(!res.ok){
+    const text = await res.text().catch(()=>'');
+    const err = new Error('Supabase delete_event_own failed: ' + res.status);
+    err.code = text.includes('judging_closed') ? 'judging_closed' : null;
+    throw err;
+  }
 }
 
 export async function fetchScores(eventId){
@@ -117,68 +136,6 @@ async function fetchScoreEntry(eventId, categoryId, contestantId, judgeSlot){
   return rows.length ? rows[0].values : null;
 }
 
-function scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, entry){
-  return {
-    event_id: eventId, category_id: categoryId, contestant_id: contestantId, judge_slot: judgeSlot,
-    values: entry,
-    total_only: !!entry.totalOnly,
-    submitted_at: new Date(entry.submittedAt || Date.now()).toISOString(),
-    edited_by_organizer: !!entry.editedByOrganizer,
-    last_edited_at: entry.lastEditedAt ? new Date(entry.lastEditedAt).toISOString() : null,
-    previous_values: entry.previousValues || null,
-  };
-}
-
-async function upsertScoreRows(rows){
-  if(!rows.length) return;
-  const res = await fetch(`${REST}/scores?on_conflict=event_id,category_id,contestant_id,judge_slot`, {
-    method: 'POST',
-    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(rows)
-  });
-  if(!res.ok) throw new Error('Supabase scores upsert failed: ' + res.status);
-}
-
-async function deleteScoreRows(keys){
-  if(!keys.length) return;
-  const clauses = keys.map(key => {
-    const [eventId, categoryId, contestantId, judgeSlot] = key.split('|');
-    return `and(event_id.eq.${eventId},category_id.eq.${categoryId},contestant_id.eq.${contestantId},judge_slot.eq.${judgeSlot})`;
-  });
-  const res = await fetch(`${REST}/scores?or=(${clauses.join(',')})`, {
-    method: 'DELETE',
-    headers: { ...AUTH_HEADERS, Prefer: 'return=minimal' }
-  });
-  if(!res.ok) throw new Error('Supabase scores delete failed: ' + res.status);
-}
-
-// Best-effort append-only audit log — one row per changed score, not a
-// capped whole-snapshot backup, so it never needs to discard old entries.
-async function logScoreHistory(rows){
-  if(!rows.length) return;
-  const body = rows.map(r => ({
-    event_id: r.event_id, category_id: r.category_id, contestant_id: r.contestant_id, judge_slot: r.judge_slot,
-    values: r.values, changed_by: r.edited_by_organizer ? 'organizer' : 'judge'
-  }));
-  await fetch(`${REST}/score_history`, {
-    method: 'POST',
-    headers: { ...AUTH_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify(body)
-  });
-}
-
-// The score save itself already succeeded by the time this runs, so a
-// failure here must never fail the caller -- it only needs to be visible
-// and retryable instead of silently going to console.error.
-async function logScoreHistoryOrToast(rows){
-  try{
-    await logScoreHistory(rows);
-  }catch(e){
-    console.error('history backup failed', e);
-    showToast('Edit history backup failed', true, ()=>logScoreHistoryOrToast(rows));
-  }
-}
-
 // Lightweight per-category summary of the latest organizer-made correction,
 // used only to decide whether to show an "edited since printed" badge --
 // not the full change detail (see fetchScoreHistoryForCategory for that).
@@ -200,7 +157,7 @@ export async function fetchOrganizerEditSummary(eventId){
 export async function fetchScoreHistoryForCategory(eventId, categoryId){
   const params = new URLSearchParams({
     event_id: `eq.${eventId}`, category_id: `eq.${categoryId}`,
-    select: 'contestant_id,judge_slot,values,changed_at,changed_by', order: 'changed_at.desc', limit: '200'
+    select: 'contestant_id,judge_slot,values,old_values,reason,changed_at,changed_by', order: 'changed_at.desc', limit: '200'
   });
   const res = await fetch(`${REST}/score_history?${params}`, { headers: AUTH_HEADERS });
   if(!res.ok) throw new Error('Supabase score_history GET failed: ' + res.status);
@@ -263,6 +220,12 @@ export async function saveConfig(){
       showToast('Setup was changed elsewhere — reload the page before editing again', true);
       return false;
     }
+    if(e && e.code === 'judging_closed'){
+      markJudgingClosed();
+      showToast('Judging is closed, so setup is frozen. Ask your admin to reopen it.', true);
+      render();
+      return false;
+    }
     console.error('save config failed', e);
     showToast('Save failed — check connection', true, async ()=>{
       const ok = await saveConfig();
@@ -272,6 +235,51 @@ export async function saveConfig(){
   }
 }
 
+// All score writes go through security definer RPCs (submit_judge_score,
+// retract_judge_score, organizer_correct_score) that write the score row and
+// its score_history row in one transaction and refuse once the event is closed.
+// The browser no longer writes `scores` or `score_history` directly.
+
+export function isJudgingClosed(){
+  const ev = state.config && state.config.events[0];
+  return !!(ev && ev.scoringClosedAt);
+}
+
+// Records that the server said judging is closed, so the UI flips to read-only
+// immediately instead of waiting for the next poll.
+function markJudgingClosed(){
+  const ev = state.config && state.config.events[0];
+  if(ev && !ev.scoringClosedAt) ev.scoringClosedAt = new Date().toISOString();
+}
+
+function splitKey(key){
+  const [eventId, categoryId, contestantId, judgeSlot] = key.split('|');
+  return { eventId, categoryId, contestantId, judgeSlot };
+}
+
+async function rpcSubmitScore(key, entry){
+  const k = splitKey(key);
+  return rpcJson('submit_judge_score', {
+    p_event_id: k.eventId, p_category_id: k.categoryId, p_contestant_id: k.contestantId, p_judge_slot: k.judgeSlot,
+    p_values: entry, p_total_only: !!entry.totalOnly
+  });
+}
+
+async function rpcRetractScore(key, restoreEntry){
+  const k = splitKey(key);
+  return rpcJson('retract_judge_score', {
+    p_event_id: k.eventId, p_category_id: k.categoryId, p_contestant_id: k.contestantId, p_judge_slot: k.judgeSlot,
+    p_restore: restoreEntry || null
+  });
+}
+
+function toastJudgingClosed(){
+  showToast('Judging is closed. Your change was not saved.', true);
+}
+
+// Bulk helper kept for the one-time admin loaders (historicalLoaders.js):
+// diff against the latest scores, then write each changed row through the
+// RPCs. Fails (and writes nothing further) as soon as judging is closed.
 export async function saveScoresMerge(mutateFn){
   const eventId = state.eventId;
   try{
@@ -280,22 +288,15 @@ export async function saveScoresMerge(mutateFn){
     const before = {...latest};
     mutateFn(latest);
 
-    const upsertRows = [];
-    Object.keys(latest).forEach(key => {
-      if(latest[key] !== before[key]){
-        const [eId, categoryId, contestantId, judgeSlot] = key.split('|');
-        upsertRows.push(scoreRowFromEntry(eId, categoryId, contestantId, judgeSlot, latest[key]));
-      }
-    });
-    const deleteKeys = Object.keys(before).filter(k => !(k in latest));
-
-    await upsertScoreRows(upsertRows);
-    await deleteScoreRows(deleteKeys);
+    const changed = Object.keys(latest).filter(key => latest[key] !== before[key]);
+    const deleted = Object.keys(before).filter(k => !(k in latest));
+    for(const key of changed) await rpcSubmitScore(key, latest[key]);
+    for(const key of deleted) await rpcRetractScore(key, null);
 
     state.scores = latest;
-    await logScoreHistoryOrToast(upsertRows);
     return true;
   }catch(e){
+    if(e && e.code === 'judging_closed'){ markJudgingClosed(); toastJudgingClosed(); render(); return false; }
     console.error('saveScoresMerge failed', e);
     showToast('Save failed — check connection', true, async ()=>{
       const ok = await saveScoresMerge(mutateFn);
@@ -305,15 +306,20 @@ export async function saveScoresMerge(mutateFn){
   }
 }
 
+// A judge's own submission. On judging_closed the draft in state.draft is left
+// untouched (never discarded), the UI flips to read-only, and false is returned.
 export async function saveScoreEntry(key, entry){
   try{
-    const [eventId, categoryId, contestantId, judgeSlot] = key.split('|');
-    const row = scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, entry);
-    await upsertScoreRows([row]);
+    await rpcSubmitScore(key, entry);
     state.scores[key] = entry;
-    await logScoreHistoryOrToast([row]);
     return true;
   }catch(e){
+    if(e && e.code === 'judging_closed'){
+      markJudgingClosed();
+      showToast('Judging is closed. Your score was not saved.', true);
+      render();
+      return false;
+    }
     console.error('saveScoreEntry failed', e);
     showToast('Save failed — check connection', true, async ()=>{
       const ok = await saveScoreEntry(key, entry);
@@ -323,16 +329,47 @@ export async function saveScoreEntry(key, entry){
   }
 }
 
-export async function saveOrganizerScoreEdit(key){
+// The 6-second Undo on a judge's submission: put the previous entry back, or
+// remove the score if it was a new one.
+export async function undoScoreEntry(key, previousEntry){
+  try{
+    await rpcRetractScore(key, previousEntry);
+    if(previousEntry) state.scores[key] = previousEntry;
+    else delete state.scores[key];
+    return true;
+  }catch(e){
+    if(e && e.code === 'judging_closed'){ markJudgingClosed(); toastJudgingClosed(); render(); return false; }
+    console.error('undoScoreEntry failed', e);
+    showToast('Undo failed — check connection', true);
+    return false;
+  }
+}
+
+// The organizer PIN was verified when this tab unlocked and is kept only in
+// memory (state.orgPin, never persisted) so close/correct can re-verify it on
+// the server. If it no longer matches (admin reset it) or the organizer is
+// locked out, drop back to the PIN gate.
+function handleOrganizerPinFailure(res){
+  state.orgUnlocked = false;
+  state.orgPin = null;
+  showToast(res && res.locked
+    ? 'Too many attempts. Try again in a few minutes.'
+    : 'The organizer PIN was not accepted. Unlock again.', true);
+  render();
+}
+
+// reason is required by the server once judging is closed (two words or more);
+// optional before. Returns true on success.
+export async function saveOrganizerScoreEdit(key, reason){
   const draft = state.orgEditDraft[key];
   if(!draft) return false;
   try{
-    const [eventId, categoryId, contestantId, judgeSlot] = key.split('|');
+    const { eventId, categoryId, contestantId, judgeSlot } = splitKey(key);
     let existing = await fetchScoreEntry(eventId, categoryId, contestantId, judgeSlot);
     if(!existing) existing = state.scores[key];
     let updated;
     if(!existing){
-      updated = {...draft, judge: judgeSlot, event: eventId, category: categoryId, contestant: contestantId, submittedAt: Date.now(), editedByOrganizer: true};
+      updated = {...draft, judge: judgeSlot, event: eventId, category: categoryId, contestant: contestantId, submittedAt: Date.now()};
     } else {
       updated = {...existing};
       if(existing.totalOnly){
@@ -346,24 +383,26 @@ export async function saveOrganizerScoreEdit(key){
       } else {
         Object.keys(draft).forEach(k=>{ updated[k] = draft[k]; });
       }
-      if(!existing.previousValues){
-        const skip = ['editedByOrganizer','previousValues','lastEditedAt'];
-        const originalSnapshot = {};
-        Object.keys(existing).forEach(k=>{ if(!skip.includes(k)) originalSnapshot[k] = existing[k]; });
-        updated.previousValues = {...originalSnapshot, capturedAt: Date.now()};
-      }
-      updated.editedByOrganizer = true;
-      updated.lastEditedAt = Date.now();
     }
-    const row = scoreRowFromEntry(eventId, categoryId, contestantId, judgeSlot, updated);
-    await upsertScoreRows([row]);
-    state.scores[key] = updated;
-    await logScoreHistoryOrToast([row]);
+    // The server owns editedByOrganizer / lastEditedAt / previousValues and
+    // returns the final entry.
+    const res = await rpcJson('organizer_correct_score', {
+      p_event_id: eventId, p_pin: state.orgPin || '', p_category_id: categoryId, p_contestant_id: contestantId,
+      p_judge_slot: judgeSlot, p_new_values: updated, p_reason: reason || null
+    });
+    if(!res.ok){ handleOrganizerPinFailure(res); return false; }
+    state.scores[key] = res.values;
+    delete state.organizerEditSummary[eventId];
+    delete state.scoreHistoryCache[eventId + '|' + categoryId];
     return true;
   }catch(e){
+    if(e && e.code === 'reason_required'){
+      showToast('Enter a reason of at least two words.', true);
+      return false;
+    }
     console.error('saveOrganizerScoreEdit failed', e);
     showToast('Save failed — check connection', true, async ()=>{
-      const ok = await saveOrganizerScoreEdit(key);
+      const ok = await saveOrganizerScoreEdit(key, reason);
       if(ok){
         delete state.orgEditDraft[key];
         state.orgEditKey = null;
@@ -372,6 +411,26 @@ export async function saveOrganizerScoreEdit(key){
     });
     return false;
   }
+}
+
+// Organizer-only: closes judging for the whole event. The PIN is re-verified
+// server-side. Returns { ok:true, closedAt, alreadyClosed } or a PIN failure.
+export async function closeJudging(){
+  const res = await rpcJson('close_event_scoring', { p_event_id: state.eventId, p_pin: state.orgPin || '' });
+  if(res.ok){
+    const ev = state.config.events[0];
+    ev.scoringClosedAt = res.closedAt;
+  } else {
+    handleOrganizerPinFailure(res);
+  }
+  return res;
+}
+
+// Tiny status read used by the 15-second poll so every open screen learns that
+// judging closed (or reopened) within one cycle. Returns the closed timestamp or null.
+export async function fetchEventStatus(eventId){
+  const res = await rpcJson('get_event_status', { p_event_id: eventId });
+  return res ? (res.scoringClosedAt || null) : null;
 }
 
 // --- Admin-only calls (see views/admin.js). Every one of these goes through
@@ -448,6 +507,11 @@ export async function adminUpdateEventContact(token, eventId, contact){
 
 export async function adminResetOrganizerPin(token, eventId){
   return adminApi('reset-organizer-pin', { token, eventId });
+}
+
+// Reopens judging for a closed event. Admin only; logged server-side.
+export async function adminReopenScoring(token, eventId){
+  return adminApi('reopen-scoring', { token, eventId });
 }
 
 // Clears the organizer lockout and every judge lockout for one event.

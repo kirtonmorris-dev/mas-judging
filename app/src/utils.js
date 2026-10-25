@@ -153,6 +153,15 @@ export function rankContestants(ev, cat, contestants, judges){
 // Message for a PIN check that did not pass. `result` is the jsonb the
 // check_*_pin RPCs return ({locked, retryAfterSeconds, attemptsLeft}); `hint`
 // is the existing "who to ask" sentence for that screen.
+// "Oct 25, 2026, 3:42 PM" in the viewer's own time zone, for the closed-judging
+// status line, the Live Tally and the printed sign-off sheets.
+export function formatClosedAt(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export function pinFailMessage(result, hint){
   if(result && result.locked){
     const mins = Math.max(1, Math.ceil((result.retryAfterSeconds || 300) / 60));

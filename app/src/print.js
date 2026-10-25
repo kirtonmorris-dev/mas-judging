@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { showToast } from './ui.js';
-import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, formatEventDateRange, rankContestants, scoreKey, setLastPrintedAt } from './utils.js';
+import { catMaxTotal, contestantSubtitle, contestantTitle, escapeHtml, formatClosedAt, formatEventDateRange, rankContestants, scoreKey, setLastPrintedAt } from './utils.js';
 
 // Shared black-and-white chrome for all three printouts -- blank scoring
 // sheets, a judge's own scoring record, and the sign-off sheet. Pure
@@ -23,6 +23,13 @@ function buildPrintSubrow(catName, judgeName){
   const parts = [`<span class="print-meta-field"><span class="print-meta-label">Category</span><span class="print-meta-value">${escapeHtml(catName)}</span></span>`];
   if(judgeName) parts.push(`<span class="print-meta-field"><span class="print-meta-label">Judge</span><span class="print-meta-value">${escapeHtml(judgeName)}</span></span>`);
   return `<div class="print-meta-row print-meta-subrow">${parts.join('')}</div>`;
+}
+
+// Sign-off sheets state when judging closed, so a printed sheet can be matched
+// against the official close time. Nothing is printed while judging is open.
+function buildPrintClosedRow(ev){
+  if(!ev.scoringClosedAt) return '';
+  return `<div class="print-meta-row print-meta-subrow"><span class="print-meta-field"><span class="print-meta-label">Judging</span><span class="print-meta-value">Closed on ${escapeHtml(formatClosedAt(ev.scoringClosedAt))}</span></span></div>`;
 }
 
 function buildPrintFooter(){
@@ -119,6 +126,7 @@ export function buildSignoffPageHtml(ev, cat){
   let html = `<div class="print-page">`;
   html += buildPrintHeader(ev, 'Official Sign-off Sheet');
   html += buildPrintSubrow(cat.name);
+  html += buildPrintClosedRow(ev);
   html += `<table class="print-table"><thead><tr><th>Place</th><th>Entry</th>`;
   catJudges.forEach(j=>{ html += `<th class="print-num">${escapeHtml(j.name)}</th>`; });
   html += `<th class="print-num">Total</th></tr></thead><tbody>`;

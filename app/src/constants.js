@@ -54,6 +54,7 @@ export function normalizeConfig(cfg){
     if(ev.eventDateStart === undefined) ev.eventDateStart = null;
     if(ev.eventDateEnd === undefined) ev.eventDateEnd = null;
     if(ev.venue === undefined) ev.venue = null;
+    if(ev.scoringClosedAt === undefined) ev.scoringClosedAt = null;
     (ev.categories||[]).forEach(cat=>{
       if(cat.entryType !== 'individual' && cat.entryType !== 'group') cat.entryType = 'individual';
       if(!Array.isArray(cat.criteria) || cat.criteria.length===0) cat.criteria = cloneTemplate();

@@ -3,6 +3,9 @@ export let state = {
   scores: {},
   mode: 'judge',
   orgUnlocked: false,
+  // Organizer PIN, in memory only (never persisted): lets Close judging and
+  // score corrections re-verify it on the server. Cleared if it stops working.
+  orgPin: null,
   orgTab: 'setup',
   eventId: null,
   judge: null,
