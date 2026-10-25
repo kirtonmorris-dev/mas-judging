@@ -230,7 +230,9 @@ off a single `mas_judging_data(id, data jsonb)` blob table). Current tables:
      bulk delete, give it a `where true` (or a real condition) and test the
      *actual* API path (or ask the human to click it), not just SQL.
 - **Anon key security model, updated 2026-09-23**: `scores`/`score_history`
-  still have full public read/write via direct REST (no DB-level auth,
+  still have full public read via direct REST. Direct WRITES were closed by
+  phase 2 of "Close judging" (see below; if that migration has not been run,
+  they are still open). (no DB-level auth,
   PIN gates are app-only — a known, accepted tradeoff, not an oversight).
   `events`/`judges`/`categories`/`contestants` are now locked down —
   direct anon `SELECT`/`INSERT`/`UPDATE`/`DELETE` on those four tables is
@@ -576,7 +578,8 @@ Three outputs, all rendered into a hidden `#printArea` div via
 1. **Blank scoring sheets** (Setup) — one page per judge per assigned category.
 2. **"Print my scores"** (Judge tab) — a judge's own submitted record.
 3. **Sign-off sheet** (Live Tally) — tally columns + signature lines, a
-   point-in-time snapshot only (doesn't lock the category from further edits).
+   point-in-time snapshot only (printing never locks anything; judging is
+   closed separately by the organizer, and the sheet then prints the close time).
 
 ## Workbook import (multi-sheet Excel upload)
 
@@ -807,6 +810,104 @@ were verified with SQL as `anon` on the sandbox event.
 - A lockout can be triggered on purpose by anyone who knows an event id
   (nuisance DoS on event night); Admin Unlock is the remedy.
 
+## Close judging (2026-10-25)
+
+**What it does**: once the organizer presses **Close judging** (Organizer view,
+a card above the tabs; confirmation: "Close judging for <event>? Judges will no
+longer be able to submit or change scores."), the whole event is locked **in
+the database**, not just the UI. Manual only, whole event only. Reopening is
+admin only (Admin view, "Reopen judging").
+
+**Schema/RPCs** (migrations `scripts/migrations/2026-10-25_close_judging.sql`
+= phase 1, additive; `2026-10-25_close_judging_phase2_revoke_score_writes.sql`
+= phase 2, the grant revocation, run separately):
+- `events.scoring_closed_at timestamptz null`; `score_history.reason text` and
+  `score_history.old_values jsonb`; `event_lock_log(id, event_id, action
+  'close'|'reopen', actor 'organizer'|'admin', at)` -- RLS on, no anon grants,
+  no FK so a log row survives the event being deleted.
+- `submit_judge_score(event, category, contestant, judge_slot, values, total_only)`
+  -- anon; upserts the score row and appends the history row in one
+  transaction; raises `judging_closed` if closed. The `submitted_at` it stores is
+  the server clock. `retract_judge_score(..., p_restore)` is the judge's 6-second
+  Undo (restore previous entry, or delete the score and log `judge_undo`); also
+  refused when closed.
+- `organizer_correct_score(event, pin, category, contestant, judge_slot,
+  new_values, reason)` -- anon; verifies the organizer PIN server-side through
+  `pin_attempt_register` (a wrong PIN counts toward the organizer lockout and
+  RETURNS `{ok:false,error:'bad_pin'|'locked',...}` -- it never raises, which
+  would roll the count back). Works before and after close. After close a reason
+  of at least two words (and 6+ characters) is required (`reason_required`).
+  The server owns `editedByOrganizer` / `lastEditedAt` / `previousValues`, and
+  writes `score_history` with old value, new value, reason, `changed_by
+  'organizer'`.
+- `close_event_scoring(event, pin)` -- anon; PIN checked as above; idempotent
+  (a second close changes nothing and adds no log row). Returns `{ok, closedAt,
+  alreadyClosed}`. `reopen_event_scoring_admin(event)` -- service_role only,
+  idempotent, logged; route `api/admin/reopen-scoring.js`.
+- `get_event_status(event)` -> `{scoringClosedAt}` (anon), used by the poll.
+  `get_event_config` and `list_events_admin` now also return `scoringClosedAt`.
+
+**Closed-event rules**: judges cannot submit, edit, undo or delete; the organizer
+can still correct a score but only with a typed reason (history shows old -> new
+and the reason); `replace_event_config` and `delete_event_own` refuse with
+`judging_closed` (structure frozen; the organizer's Setup renders as a disabled
+fieldset and "Remove this event" is hidden). **Deleting a closed event:** an
+admin reopens it first, then removes it (`delete_event_own` is anon-callable, so
+it cannot tell an admin from an organizer; this is the only way without a new
+admin route). Judges see a "Judging is closed." banner and a read-only scoring
+card; an unsubmitted draft stays visible, labelled "not saved", never discarded.
+The Live Tally shows "Judging closed on ..." and the sign-off sheets print the
+same line.
+
+**Concurrency**: score writers take an advisory lock (shared) plus
+`FOR SHARE` on the event row; close/reopen take the advisory lock (exclusive)
+plus `FOR UPDATE`. Timestamps use `clock_timestamp()` taken after the locks, so
+no score is stamped later than `scoring_closed_at`. The advisory lock is there
+because row locks alone starved the close: measured with 32 parallel submitters
+the `FOR UPDATE` only got in after the load stopped (the new `FOR SHARE` lockers
+do not queue behind a waiting `FOR UPDATE`). With it, a close under load lands
+within a few ms. Verified locally with `pgbench` (32 clients, 6 rounds, ~190k
+submits): zero score or history rows after the close timestamp, one log row each.
+
+**Client** (`app/src/api.js`): the browser no longer writes `scores` or
+`score_history` at all (only GETs). `saveScoreEntry` / `undoScoreEntry` /
+`saveOrganizerScoreEdit` / `closeJudging` call the RPCs; `saveScoresMerge`
+(used only by `historicalLoaders.js`) now loops over the RPCs. The organizer PIN
+is kept in memory only (`state.orgPin`, set on unlock) so close and corrections
+can re-verify it; if it stops working the UI drops back to the PIN gate. The
+15-second poll (`main.js`) now also calls `get_event_status` and re-renders only
+when the closed flag changes, so a judge mid-score sees the banner within one
+cycle without losing inputs.
+
+**Grants** (phase 2): drops the anon `INSERT/UPDATE/DELETE` policies on
+`scores` and `INSERT` on `score_history` and revokes the matching table grants
+from `anon`/`authenticated`/`public`. `SELECT` stays (tally, Judge Detail, print
+all read directly). **Run phase 2 only after the new client is live on main and
+verified, and when no event is live**: any browser still running the old
+JavaScript (a judge's phone with a tab left open) writes by direct REST and will
+fail with "Save failed" until reloaded. Rollback SQL is in the phase 2 file.
+Until phase 2 runs, the close is enforced for every client that uses the RPCs but
+a stale tab or a script can still write directly.
+
+**Exceptions / known limits**:
+- `historicalLoaders.js` (one-time admin loaders, no callers in the app) runs
+  through the RPCs now, so it works while an event is open and fails once closed.
+  It also loses the historical `submittedAt` on the row (the server stamps the
+  time; the value inside the entry JSON is untouched).
+- The judge write RPCs take only a judge slot, no PIN, same trust model as the
+  old direct writes: anyone who knows an event id can score as any judge until
+  the event is closed. Closing is what freezes it. The organizer PIN is checked
+  on close and on corrections, not for judge writes.
+- The organizer has one shared PIN, so `changed_by` can only say `organizer`;
+  there is no per-person identity in the history.
+- `replace_event_config` holds the event row while it rewrites config, so a judge
+  submit during an organizer config save waits for it (milliseconds).
+- `scripts/stress-test.mjs` writes through `submit_judge_score` and has a
+  mid-burst close scenario. Its setup/cleanup call admin RPCs, so it needs
+  `SUPABASE_SERVICE_ROLE_KEY` in the environment (it had been silently broken
+  since the admin RPCs were locked down 2026-09-24); `STRESS_SUPABASE_URL` aims it
+  at a local copy.
+
 ## Score history audit log now awaited, not fire-and-forget (2026-09-27)
 
 **The problem this fixed**: `api.js`'s `saveScoreEntry`, `saveScoresMerge`,
@@ -842,8 +943,9 @@ resubmitted entry. Confirmed directly by Kirt on the preview before merge.
 - No account system beyond judge PIN + organizer PIN + admin PIN.
 - No real-time push (no websockets) — polling only (15s interval in
   `src/main.js`, paused while a judge is on an active scoring card).
-- No lock/freeze mechanism for categories after sign-off printing
-  (deliberate, confirmed with Kirt).
+- No per-category lock, and nothing closes automatically: not on printing
+  a sign-off sheet, not on the event end date. Judging is closed for the
+  whole event, manually, by the organizer ("Close judging", see below).
 - No DB-level authorization beyond RLS policies scoped by the event-scoped
   RPCs — see "Client-level data isolation" above for exactly what is and
   isn't enforced at the DB layer now (the RLS lockdown migration is done —
