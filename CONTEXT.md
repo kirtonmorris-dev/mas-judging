@@ -889,6 +889,27 @@ fail with "Save failed" until reloaded. Rollback SQL is in the phase 2 file.
 Until phase 2 runs, the close is enforced for every client that uses the RPCs but
 a stale tab or a script can still write directly.
 
+**Rollout status (2026-10-25)**:
+- **Phase 1 is applied** to the shared project (`pjqojhtqxljnukwlzekr`, migration
+  `close_judging_phase1`, same SQL as the repo file). Verified read-only against the
+  database: columns, `event_lock_log` (RLS on, anon denied), grants (anon can call
+  the five RPCs, only service_role can call `reopen_event_scoring_admin` and
+  `list_events_admin`), function bodies, and `get_event_config` for the live NYC
+  event unchanged apart from `scoringClosedAt: null` (no `pin` key).
+- **Phase 2 is NOT applied.** Anon can still write `scores`/`score_history` directly,
+  so the close is not airtight against a stale tab or a script yet. Run it only
+  after the new client is live on main and no event is live.
+- **Tested** on a scratch event on the real project (since deleted) through the
+  preview deploy by hand, plus a 26-case run as the `anon` role inside a rolled-back
+  transaction (permissions, closed-event refusals, reason rules, organizer lockout
+  and expiry, judge-slot isolation, reopen). Concurrency was verified on a local
+  Postgres 16 mirror with `pgbench`; a sequential batch on the real project
+  confirmed ordering (5 accepted, close, 5 rejected, zero writes after the close
+  timestamp) but was not a true race.
+- **Not run against the real project:** `scripts/stress-test.mjs` (skipped by
+  decision; it needs `SUPABASE_SERVICE_ROLE_KEY`). It passes 17/17 against the local
+  mirror.
+
 **Exceptions / known limits**:
 - `historicalLoaders.js` (one-time admin loaders, no callers in the app) runs
   through the RPCs now, so it works while an event is open and fails once closed.
