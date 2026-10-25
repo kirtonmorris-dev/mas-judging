@@ -2,8 +2,9 @@
 /*
  * Unattended stress/concurrency test for the Judge D Show Supabase backend.
  *
- * Exercises the exact REST/RPC calls src/api.js makes (upsert scores,
- * replace_event_config, fetchScores) at real concurrency, entirely against a
+ * Exercises the exact RPC calls src/api.js makes (submit_judge_score,
+ * replace_event_config, get_event_config, close_event_scoring) and the REST
+ * score read (fetchScores) at real concurrency, entirely against a
  * disposable synthetic event created fresh each run under the "Internal Test
  * / Sandbox" client (via create_event_admin) -- it never touches real
  * event/judge/contestant/score data. The script cleans up any leftover
@@ -11,6 +12,12 @@
  * runs its scenarios, then deletes it via delete_event_own.
  *
  * Requires Node 18+ (built-in fetch). No other dependencies.
+ *
+ * Setup/cleanup call admin-only RPCs (create_event_admin, list_clients_admin,
+ * list_events_admin, reopen_event_scoring_admin), which anon cannot execute
+ * (revoked 2026-09-24). Export the service-role key for those calls only:
+ *   SUPABASE_SERVICE_ROLE_KEY=... node scripts/stress-test.mjs
+ * Never commit that key. Score writes use the anon key, like the real app.
  *
  * Usage:
  *   node scripts/stress-test.mjs
@@ -25,17 +32,17 @@
 // browser ES module; there's no package.json "type" field to make that importable
 // from plain Node without friction). These are Supabase's public/publishable
 // values, safe to duplicate -- update both places together if they ever change.
-const SUPABASE_URL = 'https://pjqojhtqxljnukwlzekr.supabase.co';
+const SUPABASE_URL = process.env.STRESS_SUPABASE_URL || 'https://pjqojhtqxljnukwlzekr.supabase.co'; // override only to aim at a local copy
 const SUPABASE_KEY = 'sb_publishable_ahi2YrsAURh98_DGfM1Hfw_sRw9T34B';
 
 const REST = `${SUPABASE_URL}/rest/v1`;
 const AUTH_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // events/judges/categories/contestants are locked down (RLS + revoked anon
 // grants) -- reachable only through the security-definer, event-scoped RPCs
-// below. scores/score_history stay directly REST-accessible (see CONTEXT.md's
-// "Client-level data isolation" section), so upsertScore/fetchScores below
-// still hit /scores directly.
+// below. Scores are WRITTEN only through submit_judge_score (close judging
+// migration); /scores stays directly readable, so fetchScores still GETs it.
 const STRESS_EVENT_NAME = 'Stress Test Event (disposable)';
 const SANDBOX_CLIENT_NAME = 'Internal Test / Sandbox';
 const TEST_CATEGORY_ID = 'stress-test-cat';
@@ -87,17 +94,27 @@ async function rpc(fn, body){
   return { data: text ? JSON.parse(text) : null, ms };
 }
 
-async function upsertScore(contestantId, judgeSlot, values){
-  const { res, ms } = await rest(`/scores?on_conflict=event_id,category_id,contestant_id,judge_slot`, {
+// Admin-only RPCs: service-role key, same as the /api/admin/* proxy uses.
+async function adminRpc(fn, body){
+  if(!SERVICE_KEY) throw new Error(`${fn} needs SUPABASE_SERVICE_ROLE_KEY in the environment (admin RPCs are not anon-callable)`);
+  const res = await fetch(`${REST}/rpc/${fn}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([{
-      event_id: TEST_EVENT_ID, category_id: TEST_CATEGORY_ID, contestant_id: contestantId, judge_slot: judgeSlot,
-      values, submitted_at: new Date().toISOString()
-    }])
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
   });
-  if(!res.ok) throw new Error(`upsert -> ${res.status}: ${await res.text()}`);
-  return ms;
+  const text = await res.text();
+  if(!res.ok) throw new Error(`${fn} -> ${res.status}: ${text}`);
+  return { data: text ? JSON.parse(text) : null };
+}
+
+// A judge score write, exactly as the app does it: one RPC, score row + history row.
+async function upsertScore(contestantId, judgeSlot, values){
+  const started = Date.now();
+  await rpc('submit_judge_score', {
+    p_event_id: TEST_EVENT_ID, p_category_id: TEST_CATEGORY_ID, p_contestant_id: contestantId, p_judge_slot: judgeSlot,
+    p_values: values, p_total_only: false
+  });
+  return Date.now() - started;
 }
 
 async function fetchScores(){
@@ -107,16 +124,18 @@ async function fetchScores(){
 }
 
 async function findSandboxClientId(){
-  const { data: clients } = await rpc('list_clients_admin', {});
+  const { data: clients } = await adminRpc('list_clients_admin', {});
   const sandbox = (clients || []).find(c => c.name === SANDBOX_CLIENT_NAME);
   if(!sandbox) throw new Error(`sandbox client "${SANDBOX_CLIENT_NAME}" not found -- create it once via /app?admin=1 before running this script`);
   return sandbox.id;
 }
 
 async function cleanupLeftoverStressEvents(){
-  const { data: events } = await rpc('list_events_admin', {});
+  const { data: events } = await adminRpc('list_events_admin', {});
   const leftovers = (events || []).filter(e => e.name === STRESS_EVENT_NAME);
   for(const e of leftovers){
+    // A closed event cannot be deleted by delete_event_own: reopen it first.
+    await adminRpc('reopen_event_scoring_admin', { p_event_id: e.id });
     await rpc('delete_event_own', { p_event_id: e.id });
   }
   return leftovers.length;
@@ -124,6 +143,7 @@ async function cleanupLeftoverStressEvents(){
 
 async function cleanupTestEvent(){
   if(!TEST_EVENT_ID) return;
+  await adminRpc('reopen_event_scoring_admin', { p_event_id: TEST_EVENT_ID });
   await rpc('delete_event_own', { p_event_id: TEST_EVENT_ID });
 }
 
@@ -132,7 +152,7 @@ async function setupTestEvent(){
   if(removed) console.log(`  (cleaned up ${removed} leftover stress-test event(s) from a previous run)`);
 
   const clientId = await findSandboxClientId();
-  const { data: eventId } = await rpc('create_event_admin', { p_client_id: clientId, p_name: STRESS_EVENT_NAME });
+  const { data: eventId } = await adminRpc('create_event_admin', { p_client_id: clientId, p_name: STRESS_EVENT_NAME });
   TEST_EVENT_ID = eventId;
 
   const judges = Array.from({ length: CONCURRENCY }, (_, i) => ({
@@ -248,6 +268,72 @@ async function scenarioConfigOptimisticLock(){
   else fail('exactly one concurrent save won', `${succeeded.length} succeeded (expected exactly 1)`);
 }
 
+// Scenario 5: judges submit continuously while the organizer presses Close.
+// Every submit must either land before the close or be rejected with
+// judging_closed -- and no score row may be stamped after the close timestamp.
+async function scenarioCloseRace(contestantIds){
+  section(`Scenario 5: ${CONCURRENCY} judges submitting while judging is closed mid-burst`);
+  const { data: events } = await adminRpc('list_events_admin', {});
+  const organizerPin = (events || []).find(e => e.id === TEST_EVENT_ID)?.organizerPin;
+  if(!organizerPin){ fail('found the disposable event organizer PIN'); return; }
+
+  const wrong = await rpc('close_event_scoring', { p_event_id: TEST_EVENT_ID, p_pin: organizerPin === '0000' ? '0001' : '0000' });
+  if(wrong.data.ok === false && wrong.data.error === 'bad_pin') pass('close with a wrong organizer PIN is refused', `attemptsLeft=${wrong.data.attemptsLeft}`);
+  else fail('close with a wrong organizer PIN is refused', JSON.stringify(wrong.data));
+
+  let accepted = 0, rejected = 0, other = 0, stop = false;
+  const worker = async (i) => {
+    let n = 0;
+    while(!stop){
+      try{
+        await rpc('submit_judge_score', {
+          p_event_id: TEST_EVENT_ID, p_category_id: TEST_CATEGORY_ID,
+          p_contestant_id: contestantIds[(i + n++) % contestantIds.length], p_judge_slot: `Judge ${i}`, p_values: { k1: n }, p_total_only: false
+        });
+        accepted++;
+      }catch(e){
+        if(String(e.body || e.message).includes('judging_closed')) rejected++; else other++;
+      }
+    }
+  };
+  const workers = Array.from({ length: CONCURRENCY }, (_, i) => worker(i));
+  await new Promise(r => setTimeout(r, 1500));
+  const closeStarted = Date.now();
+  const closed = await rpc('close_event_scoring', { p_event_id: TEST_EVENT_ID, p_pin: organizerPin });
+  const closeMs = Date.now() - closeStarted;
+  await new Promise(r => setTimeout(r, 1500));
+  stop = true;
+  await Promise.all(workers);
+
+  if(closed.data.ok && closed.data.alreadyClosed === false) pass('close with the right PIN succeeded', `took ${closeMs}ms under load`);
+  else fail('close with the right PIN succeeded', JSON.stringify(closed.data));
+  const again = await rpc('close_event_scoring', { p_event_id: TEST_EVENT_ID, p_pin: organizerPin });
+  if(again.data.ok && again.data.alreadyClosed === true && again.data.closedAt === closed.data.closedAt) pass('a second close is a no-op (same timestamp)');
+  else fail('a second close is a no-op (same timestamp)', JSON.stringify(again.data));
+
+  if(other === 0) pass('no unexpected errors during the race', `${accepted} accepted before close, ${rejected} rejected after`);
+  else fail('no unexpected errors during the race', `${other} unexpected`);
+  if(accepted > 0 && rejected > 0) pass('the burst straddled the close', `accepted=${accepted} rejected=${rejected}`);
+  else fail('the burst straddled the close', `accepted=${accepted} rejected=${rejected}`);
+
+  const closedAtMs = Date.parse(closed.data.closedAt);
+  const { res } = await rest(`/scores?event_id=eq.${TEST_EVENT_ID}&select=contestant_id,judge_slot,submitted_at`);
+  const rows = await res.json();
+  const late = rows.filter(r => Date.parse(r.submitted_at) > closedAtMs);
+  if(late.length === 0) pass('no score row is stamped after the close timestamp', `${rows.length} rows checked`);
+  else fail('no score row is stamped after the close timestamp', `${late.length} rows late`);
+
+  // After phase 2 (anon writes revoked) a direct REST write must be denied; before it, it is allowed
+  // -- informational only, because phase 2 is applied separately.
+  const direct = await rest('/scores', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify([{ event_id: TEST_EVENT_ID, category_id: TEST_CATEGORY_ID, contestant_id: 'direct-write', judge_slot: 'Judge 0', values: { k1: 1 } }])
+  });
+  if(direct.res.status === 401 || direct.res.status === 403) pass('direct REST write to scores is denied (phase 2 applied)');
+  else console.log(`  - direct REST write to scores returned ${direct.res.status}: phase 2 (grant revocation) is not applied yet (informational)`);
+}
+
 async function main(){
   console.log(`Stress test config: concurrency=${CONCURRENCY} rounds=${ROUNDS} contestants=${CONTESTANT_COUNT} keep=${KEEP}`);
   console.log(`Target: ${SUPABASE_URL} (disposable event created fresh under "${SANDBOX_CLIENT_NAME}")`);
@@ -268,6 +354,7 @@ async function main(){
     await scenarioSameKeyRace(contestantIds[0]);
     await scenarioSustainedLoad(contestantIds);
     await scenarioConfigOptimisticLock();
+    await scenarioCloseRace(contestantIds);
   }catch(e){
     fail('scenario runner', `unexpected exception: ${e.stack || e.message}`);
   }
