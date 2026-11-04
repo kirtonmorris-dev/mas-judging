@@ -1,5 +1,5 @@
 // Signed fill-time tokens for the lead form. A token is "<issuedAtMs>.<hmac>".
-// The browser fetches one when the modal opens (GET /api/lead-token) and sends
+// The browser fetches one when the modal opens (GET /api/lead) and sends
 // it back with the form. The server then knows how long the form was open
 // without storing anything. Prefixed "_" so Vercel does not deploy it as a route.
 //

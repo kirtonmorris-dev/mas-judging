@@ -1,4 +1,7 @@
+// GET  /api/lead -> { token }   fill-time token, fetched when the modal opens
 // POST /api/lead -- marketing-site lead form.
+// (One function for both: the Vercel Hobby plan caps a deployment at 12
+// serverless functions and api/admin/ already uses 11.)
 // Order: honeypot -> unknown fields -> validation -> token/fill-time -> rate
 // limit -> save to Supabase -> send to HubSpot -> record the HubSpot result.
 // A lead that was saved always gets a success response, even if HubSpot failed
@@ -8,7 +11,7 @@
 // with a spam status; they are never sent to HubSpot.
 const crypto = require('crypto');
 const { parseLead, unknownLeadFields, LEAD_MAX } = require('./_lib/contactValidation');
-const { checkToken } = require('./_lib/leadToken');
+const { checkToken, issueToken } = require('./_lib/leadToken');
 const { insertLead, updateLead, countAccepted } = require('./_lib/leadStore');
 const { submitLeadToHubSpot } = require('./_lib/hubspot');
 
@@ -47,6 +50,16 @@ function spamRow(body, status, detail, ipHash, ua) {
 }
 
 module.exports = async (req, res) => {
+  if (req.method === 'GET') {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ token: issueToken() });
+    } catch (e) {
+      console.error('lead-token failed', e.message);
+      res.status(500).json({ error: 'server_error' });
+    }
+    return;
+  }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'method_not_allowed' });
     return;

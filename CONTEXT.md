@@ -60,8 +60,8 @@ judging app isn't the first thing a prospect hits:
   the lead-form modal (see "Lead capture" below) instead of linking to Calendly.
   **The page itself stays static and never touches Supabase or HubSpot, and is
   not wired into the app.** The only server contact is the lead form posting to
-  the `/api/lead` and `/api/lead-token` serverless functions; only those
-  functions talk to Supabase and HubSpot. It is
+  the `/api/lead` serverless function; only that
+  function talk to Supabase and HubSpot. It is
   indexed by search engines (no robots meta tag).
 - **`/app` (`app/index.html`, `app/styles.css`, `app/src/`)** — the
   actual judging app (PIN login, judge scoring, organizer tally, print
@@ -1429,10 +1429,13 @@ range, how-heard/message. Option lists live in `api/_lib/contactValidation.js`
 (`COMPETITION_TYPES`, `JUDGES_RANGES`, `CONTESTANTS_RANGES`) and must match the
 HubSpot dropdown option values exactly.
 
-**Endpoints**: `GET /api/lead-token` (signed issue-time token, HMAC with
+**Endpoints** (one function, `api/lead.js`, because Vercel Hobby caps a
+deployment at 12 functions and `api/admin/` already has 11, so there is NO
+headroom for another function until admin routes are consolidated or the plan
+changes): `GET /api/lead` (signed issue-time token, HMAC with
 `LEAD_TOKEN_SECRET`); `POST /api/lead`. Order: honeypot -> unknown fields ->
 validation -> token/fill-time -> rate limit -> save to `leads` -> HubSpot ->
-record HubSpot result. Files: `api/lead.js`, `api/lead-token.js`,
+record HubSpot result. Files: `api/lead.js`,
 `api/_lib/leadToken.js`, `leadStore.js`, `hubspot.js`.
 
 **Spam rules**: honeypot field `company_website` (off-screen, aria-hidden, not

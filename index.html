@@ -971,7 +971,7 @@
   function $(id){ return document.getElementById(id); }
 
   function fetchToken(){
-    return fetch('/api/lead-token', { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+    return fetch('/api/lead', { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function(j){ token = j.token || ''; tokenAt = Date.now(); })
       .catch(function(){ token = ''; });
   }
