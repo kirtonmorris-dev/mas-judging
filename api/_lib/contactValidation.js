@@ -45,4 +45,84 @@ function parseEventContact(body) {
   return { values: { name, email, phone } };
 }
 
-module.exports = { parseClientFields, parseEventContact };
+// ---- Marketing-site lead form (api/lead.js) ----
+// The option lists live here so the server, the HubSpot dropdown values and
+// the form in index.html stay in step. HubSpot dropdown option VALUES must be
+// these exact strings.
+const COMPETITION_TYPES = [
+  'Carnival and steelband',
+  'Music and talent shows',
+  'Pageants and cultural competitions',
+  'School and youth competitions',
+  'Pitch and business events',
+  'Other',
+];
+const JUDGES_RANGES = ['1-3', '4-6', '7-10', '11+'];
+const CONTESTANTS_RANGES = ['Under 25', '25-50', '51-100', '101-250', '250+'];
+
+const LEAD_FIELDS = [
+  'token', 'name', 'email', 'organization', 'phone', 'competitionType',
+  'eventDate', 'eventDateUnsure', 'judgesRange', 'contestantsRange', 'message',
+  'pageUri', 'utmSource', 'utmMedium', 'utmCampaign', 'utmTerm', 'utmContent',
+  'company_website', // honeypot
+];
+const LEAD_MAX = {
+  name: 120, email: 254, organization: 160, phone: 40, message: 2000,
+  pageUri: 500, utm: 200,
+};
+
+// Returns { unknown: [fields] } for unexpected keys, so the endpoint can reject them.
+function unknownLeadFields(body) {
+  return Object.keys(body).filter((k) => !LEAD_FIELDS.includes(k));
+}
+
+// Returns { values } or { errors: { field: message } }. Messages are shown to
+// the visitor as-is.
+function parseLead(body) {
+  const errors = {};
+  const v = {
+    name: str(body.name),
+    email: str(body.email),
+    organization: str(body.organization),
+    phone: str(body.phone) || null,
+    competitionType: str(body.competitionType) || null,
+    eventDate: str(body.eventDate) || null,
+    eventDateUnsure: body.eventDateUnsure === true,
+    judgesRange: str(body.judgesRange) || null,
+    contestantsRange: str(body.contestantsRange) || null,
+    message: str(body.message) || null,
+    pageUri: str(body.pageUri).slice(0, LEAD_MAX.pageUri) || null,
+    utmSource: str(body.utmSource).slice(0, LEAD_MAX.utm) || null,
+    utmMedium: str(body.utmMedium).slice(0, LEAD_MAX.utm) || null,
+    utmCampaign: str(body.utmCampaign).slice(0, LEAD_MAX.utm) || null,
+    utmTerm: str(body.utmTerm).slice(0, LEAD_MAX.utm) || null,
+    utmContent: str(body.utmContent).slice(0, LEAD_MAX.utm) || null,
+  };
+  for (const k of ['name', 'email', 'organization', 'phone', 'message']) {
+    if (body[k] != null && typeof body[k] !== 'string') errors[k] = 'Please enter text only.';
+  }
+  if (!v.name) errors.name = 'Please enter your name.';
+  else if (v.name.length > LEAD_MAX.name) errors.name = 'Name is too long (120 characters max).';
+  if (!v.email) errors.email = 'Please enter your work email.';
+  else if (v.email.length > LEAD_MAX.email || !validEmail(v.email)) errors.email = 'That email address doesn\'t look right.';
+  if (!v.organization) errors.organization = 'Please enter your organization.';
+  else if (v.organization.length > LEAD_MAX.organization) errors.organization = 'Organization is too long (160 characters max).';
+  if (v.phone && (v.phone.length > LEAD_MAX.phone || !validPhone(v.phone))) errors.phone = 'Please enter a US phone number, or leave it blank.';
+  if (v.message && v.message.length > LEAD_MAX.message) errors.message = 'Message is too long (2,000 characters max).';
+  if (v.competitionType && !COMPETITION_TYPES.includes(v.competitionType)) errors.competitionType = 'Please choose from the list.';
+  if (v.judgesRange && !JUDGES_RANGES.includes(v.judgesRange)) errors.judgesRange = 'Please choose from the list.';
+  if (v.contestantsRange && !CONTESTANTS_RANGES.includes(v.contestantsRange)) errors.contestantsRange = 'Please choose from the list.';
+  if (v.eventDate) {
+    const ok = /^\d{4}-\d{2}-\d{2}$/.test(v.eventDate) && !Number.isNaN(Date.parse(v.eventDate + 'T00:00:00Z'));
+    if (!ok) errors.eventDate = 'Please enter a valid date, or choose "Not sure yet".';
+  }
+  if (v.eventDateUnsure) v.eventDate = null;
+  if (Object.keys(errors).length) return { errors };
+  return { values: v };
+}
+
+module.exports = {
+  parseClientFields, parseEventContact,
+  parseLead, unknownLeadFields, LEAD_MAX,
+  COMPETITION_TYPES, JUDGES_RANGES, CONTESTANTS_RANGES,
+};
