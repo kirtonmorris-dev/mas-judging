@@ -132,6 +132,51 @@
     .faq-icon-v, .faq-panel { transition: none; }
   }
 </style>
+<style>
+  /* Lead form modal (opened by every Book a Call button) */
+  .jds-lead-open { border: 0; cursor: pointer; font-family: inherit; line-height: 1.2; }
+  .lead-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(14,24,46,0.72); display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
+  .lead-overlay[hidden] { display: none; }
+  .lead-dialog { position: relative; width: 100%; max-width: 560px; background: #FAF3EC; color: #181220; border-radius: 0; border-top: 4px solid #C50060; padding: 32px; margin: auto 0; }
+  .lead-dialog.lead-wide { max-width: 780px; }
+  .lead-dialog:focus { outline: none; }
+  .lead-close { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; background: transparent; color: #181220; font-size: 28px; line-height: 1; cursor: pointer; }
+  .lead-close:hover { background: rgba(24,18,32,0.06); }
+  .lead-title { margin: 0 40px 8px 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; line-height: 1.2; }
+  .lead-sub { margin: 0 0 20px; font-size: 15.5px; line-height: 1.55; color: rgba(24,18,32,0.72); }
+  .lead-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .lead-field { display: flex; flex-direction: column; margin-bottom: 14px; min-width: 0; }
+  .lead-field label, .lead-field .lead-label { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .lead-opt { font-weight: 400; color: rgba(24,18,32,0.6); }
+  .lead-field input[type=text], .lead-field input[type=email], .lead-field input[type=tel], .lead-field input[type=date], .lead-field select, .lead-field textarea { width: 100%; font: inherit; font-size: 16px; color: #181220; background: #fff; border: 1.5px solid rgba(24,18,32,0.35); border-radius: 0; padding: 10px 12px; min-height: 44px; }
+  .lead-field textarea { min-height: 88px; resize: vertical; }
+  .lead-field input:focus-visible, .lead-field select:focus-visible, .lead-field textarea:focus-visible { outline: 2px solid #C50060; outline-offset: 1px; }
+  .lead-field [aria-invalid=true] { border-color: #B00020; }
+  .lead-err { color: #B00020; font-size: 13.5px; margin-top: 4px; min-height: 0; }
+  .lead-check { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; }
+  .lead-check input { width: 18px; height: 18px; accent-color: #C50060; }
+  .lead-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+  .lead-status { font-size: 14.5px; margin: 0 0 12px; min-height: 0; }
+  .lead-status:not(:empty) { padding: 10px 12px; background: #fff; border-left: 4px solid #B00020; }
+  .lead-submit { width: 100%; background: #C50060; color: #FAF3EC; border: 0; border-radius: 0; font: inherit; font-size: 16px; font-weight: 700; padding: 14px 24px; min-height: 48px; cursor: pointer; transition: background-color 120ms cubic-bezier(.2,0,0,1); }
+  .lead-submit:hover { background: #A8004F; }
+  .lead-submit:active { background: #8A0042; transition: none; }
+  .lead-submit[disabled] { opacity: 0.6; cursor: progress; }
+  .lead-consent { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: rgba(24,18,32,0.7); }
+  .lead-consent a { text-decoration: underline; }
+  #leadCalendly { min-width: 280px; height: 660px; margin-top: 12px; }
+  .lead-fallback { margin: 12px 0 0; font-size: 15px; }
+  .lead-fallback a { color: #C50060; font-weight: 600; text-decoration: underline; }
+  .lead-dialog a:focus-visible, .lead-dialog button:focus-visible { outline: 2px solid #C50060; outline-offset: 2px; }
+  body.lead-open { overflow: hidden; }
+  @media (max-width: 680px) {
+    .lead-overlay { padding: 0; }
+    .lead-dialog, .lead-dialog.lead-wide { max-width: none; min-height: 100dvh; padding: 24px 16px 32px; }
+    .lead-row { grid-template-columns: 1fr; }
+    #leadCalendly { height: 720px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .lead-submit { transition: none; } }
+</style>
 </head>
 <body>
 
@@ -149,7 +194,7 @@
         <a href="#built-different" style="font-size: 15px; font-weight: 500;">Why It's Different</a>
         <a href="#faq" style="font-size: 15px; font-weight: 500;">FAQ</a>
         <a href="#pricing" style="font-size: 15px; font-weight: 500;">Pricing</a>
-        <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 10px 20px; border-radius: 0; font-size: 15px; font-weight: 600;">Book a Call</a>
+        <button type="button" class="jds-btn jds-btn-p jds-lead-open" data-lead-open data-lead-location="nav" style="background: #C50060; color: #FAF3EC; padding: 10px 20px; border-radius: 0; font-size: 15px; font-weight: 600;">Book a Call</button>
       </div>
     </div>
   </div>
@@ -161,7 +206,7 @@
       <h1 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 52px; line-height: 1.08; letter-spacing: -0.01em;">Your judges are still scoring on paper. Your results are still late.</h1>
       <p style="margin: 0; font-size: 19px; line-height: 1.6; color: rgba(24,18,32,0.72); max-width: 620px;">Judge D Show puts every score on a judge's phone the moment it happens, so your tally is accurate and ready before the last contestant leaves the stage.</p>
       <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
-        <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #C50060; color: #FAF3EC; padding: 14px 28px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
+        <button type="button" class="jds-btn jds-btn-p jds-lead-open" data-lead-open data-lead-location="hero" style="background: #C50060; color: #FAF3EC; padding: 14px 28px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</button>
         <a class="jds-btn jds-btn-s" href="#how-it-works" style="border: 1.5px solid rgba(24,18,32,0.25); padding: 14px 28px; border-radius: 0; font-size: 16px; font-weight: 600;">See How It Works</a>
       </div>
     </div>
@@ -735,7 +780,7 @@
       <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #C50060; margin-bottom: 16px;">Pricing</div>
       <h2 style="margin: 0 0 16px; font-family: 'Fraunces', serif; font-weight: 600; font-size: 32px; line-height: 1.2;">Priced around your event, not a subscription you don't need.</h2>
       <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.6; color: rgba(24,18,32,0.7);">Every competition is different in judge count, categories, and rounds. Tell us about yours and we'll send a quote built around what you're actually running.</p>
-      <a class="jds-btn jds-btn-p" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="display: inline-block; background: #C50060; color: #FAF3EC; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Request a Quote</a>
+      <button type="button" class="jds-btn jds-btn-p jds-lead-open" data-lead-open data-lead-location="pricing" style="display: inline-block; background: #C50060; color: #FAF3EC; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Request a Quote</button>
     </div>
   </div>
 
@@ -744,7 +789,7 @@
     <div style="max-width: 780px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px;">
       <h2 style="margin: 0; font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; line-height: 1.2; color: #FAF3EC;">Ready to see it in your judges' hands?</h2>
       <p style="margin: 0; font-size: 16px; color: #B8B0C4;">A 20-minute call is enough to show you the judge screen, the live tally, and the printed sign-off sheet.</p>
-      <a class="jds-btn jds-btn-g" href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener" style="background: #FFC94D; color: #0E182E; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</a>
+      <button type="button" class="jds-btn jds-btn-g jds-lead-open" data-lead-open data-lead-location="final_cta" style="background: #FFC94D; color: #0E182E; padding: 15px 32px; border-radius: 0; font-size: 16px; font-weight: 700;">Book a 20-Minute Call</button>
     </div>
   </div>
 
@@ -754,7 +799,7 @@
       <div>&#169; 2026 Judge D Show. An Immortelle Advisory Group product.</div>
       <div>Built by Kirt Morris, Founder &amp; Principal Consultant.</div>
     </div>
-    <div style="max-width: 1160px; margin: 8px auto 0; font-size: 13.5px;">This site uses Google Analytics to understand how visitors use this page.</div>
+    <div style="max-width: 1160px; margin: 8px auto 0; font-size: 13.5px;">This site uses Google Analytics to understand how visitors use this page. <a href="https://www.immortelleadvisorygroup.com/privacy" target="_blank" rel="noopener" style="text-decoration: underline;">Privacy policy</a>.</div>
   </div>
 
 </div>
@@ -804,6 +849,311 @@
       }
     });
   }
+})();
+</script>
+
+<!-- LEAD MODAL: every Book a Call button opens this. Submits to /api/lead, then shows the Calendly scheduler. -->
+<div id="leadModal" class="lead-overlay" hidden>
+  <div id="leadDialog" class="lead-dialog" role="dialog" aria-modal="true" aria-labelledby="leadTitle" tabindex="-1">
+    <button type="button" class="lead-close" id="leadClose" aria-label="Close">&times;</button>
+
+    <div id="leadStepForm">
+      <h2 id="leadTitle" class="lead-title">Tell us about your event</h2>
+      <p class="lead-sub">A few quick details, then pick a time that works for you. Takes about a minute.</p>
+      <form id="leadForm" novalidate>
+        <p id="leadStatus" class="lead-status" role="alert"></p>
+        <div class="lead-field">
+          <label for="lead-name">Your name</label>
+          <input type="text" id="lead-name" name="name" autocomplete="name" maxlength="120" required aria-describedby="lead-name-err">
+          <div class="lead-err" id="lead-name-err"></div>
+        </div>
+        <div class="lead-field">
+          <label for="lead-email">Work email</label>
+          <input type="email" id="lead-email" name="email" autocomplete="email" maxlength="254" required aria-describedby="lead-email-err">
+          <div class="lead-err" id="lead-email-err"></div>
+        </div>
+        <div class="lead-field">
+          <label for="lead-organization">Organization</label>
+          <input type="text" id="lead-organization" name="organization" autocomplete="organization" maxlength="160" required aria-describedby="lead-organization-err">
+          <div class="lead-err" id="lead-organization-err"></div>
+        </div>
+        <div class="lead-row">
+          <div class="lead-field">
+            <label for="lead-phone">Phone <span class="lead-opt">(optional)</span></label>
+            <input type="tel" id="lead-phone" name="phone" autocomplete="tel" maxlength="40" aria-describedby="lead-phone-err">
+            <div class="lead-err" id="lead-phone-err"></div>
+          </div>
+          <div class="lead-field">
+            <label for="lead-competitionType">Competition type <span class="lead-opt">(optional)</span></label>
+            <select id="lead-competitionType" name="competitionType">
+              <option value="">Choose one</option>
+              <option>Carnival and steelband</option>
+              <option>Music and talent shows</option>
+              <option>Pageants and cultural competitions</option>
+              <option>School and youth competitions</option>
+              <option>Pitch and business events</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="lead-field">
+          <label for="lead-eventDate">Event date <span class="lead-opt">(optional)</span></label>
+          <input type="date" id="lead-eventDate" name="eventDate" aria-describedby="lead-eventDate-err">
+          <label class="lead-check"><input type="checkbox" id="lead-eventDateUnsure" name="eventDateUnsure"> <span style="font-weight:400;">Not sure yet</span></label>
+          <div class="lead-err" id="lead-eventDate-err"></div>
+        </div>
+        <div class="lead-row">
+          <div class="lead-field">
+            <label for="lead-judgesRange">Number of judges <span class="lead-opt">(optional)</span></label>
+            <select id="lead-judgesRange" name="judgesRange">
+              <option value="">Choose one</option>
+              <option value="1-3">1 to 3</option>
+              <option value="4-6">4 to 6</option>
+              <option value="7-10">7 to 10</option>
+              <option value="11+">11 or more</option>
+            </select>
+          </div>
+          <div class="lead-field">
+            <label for="lead-contestantsRange">Number of contestants <span class="lead-opt">(optional)</span></label>
+            <select id="lead-contestantsRange" name="contestantsRange">
+              <option value="">Choose one</option>
+              <option value="Under 25">Under 25</option>
+              <option value="25-50">25 to 50</option>
+              <option value="51-100">51 to 100</option>
+              <option value="101-250">101 to 250</option>
+              <option value="250+">More than 250</option>
+            </select>
+          </div>
+        </div>
+        <div class="lead-field">
+          <label for="lead-message">How did you hear about us, or anything we should know? <span class="lead-opt">(optional)</span></label>
+          <textarea id="lead-message" name="message" maxlength="2000" aria-describedby="lead-message-err"></textarea>
+          <div class="lead-err" id="lead-message-err"></div>
+        </div>
+        <div class="lead-hp" aria-hidden="true">
+          <label for="lead-company_website">Company website</label>
+          <input type="text" id="lead-company_website" name="company_website" tabindex="-1" autocomplete="off">
+        </div>
+        <button type="submit" class="lead-submit" id="leadSubmit">Continue to pick a time</button>
+        <p class="lead-consent">By continuing, you agree to be contacted about Judge D Show. See our <a href="https://www.immortelleadvisorygroup.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
+      </form>
+    </div>
+
+    <div id="leadStepBook" hidden>
+      <h2 id="leadBookTitle" class="lead-title">Pick a time</h2>
+      <p class="lead-sub">Thanks. Choose a time for your 20-minute call below.</p>
+      <div id="leadCalendly"></div>
+      <p id="leadFallback" class="lead-fallback" hidden>Having trouble loading the calendar? <a href="https://calendly.com/kirt-immortelleadvisorygroup/30min" target="_blank" rel="noopener">Book a time here</a>.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Lead form modal. Opened by every [data-lead-open] button. */
+(function(){
+  var CAL_URL = 'https://calendly.com/kirt-immortelleadvisorygroup/30min';
+  var overlay = document.getElementById('leadModal');
+  if(!overlay) return;
+  var dialog = document.getElementById('leadDialog');
+  var form = document.getElementById('leadForm');
+  var stepForm = document.getElementById('leadStepForm');
+  var stepBook = document.getElementById('leadStepBook');
+  var statusEl = document.getElementById('leadStatus');
+  var submitBtn = document.getElementById('leadSubmit');
+  var fallbackEl = document.getElementById('leadFallback');
+  var unsure = document.getElementById('lead-eventDateUnsure');
+  var dateInput = document.getElementById('lead-eventDate');
+  var FIELDS = ['name','email','organization','phone','competitionType','eventDate','judgesRange','contestantsRange','message'];
+  var trigger = null, token = '', tokenAt = 0, submitted = false, calendlyPromise = null, calendlyShown = false;
+  var openedLocation = '';
+
+  function track(name, params){ try { if(typeof window.gtag === 'function') window.gtag('event', name, params || {}); } catch(e){} }
+  function $(id){ return document.getElementById(id); }
+
+  function fetchToken(){
+    return fetch('/api/lead-token', { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(j){ token = j.token || ''; tokenAt = Date.now(); })
+      .catch(function(){ token = ''; });
+  }
+
+  function loadCalendly(){
+    if(calendlyPromise) return calendlyPromise;
+    calendlyPromise = new Promise(function(resolve, reject){
+      var css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = 'https://assets.calendly.com/assets/external/widget.css';
+      document.head.appendChild(css);
+      var sc = document.createElement('script');
+      sc.src = 'https://assets.calendly.com/assets/external/widget.js'; sc.async = true;
+      sc.onload = function(){ window.Calendly ? resolve() : reject(); };
+      sc.onerror = function(){ reject(); };
+      document.head.appendChild(sc);
+      setTimeout(reject, 10000);
+    });
+    return calendlyPromise;
+  }
+
+  function focusables(){
+    return Array.prototype.filter.call(dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'), function(el){
+      return el.offsetParent !== null && !el.closest('[hidden]');
+    });
+  }
+
+  function openModal(btn){
+    trigger = btn;
+    openedLocation = btn.getAttribute('data-lead-location') || '';
+    overlay.hidden = false;
+    document.body.classList.add('lead-open');
+    track('lead_form_open', { location: openedLocation });
+    if(submitted){ showBooking(); return; }
+    stepForm.hidden = false; stepBook.hidden = true; dialog.classList.remove('lead-wide');
+    fetchToken();
+    loadCalendly().catch(function(){}); // warm the scheduler while they fill the form
+    setTimeout(function(){ $('lead-name').focus(); }, 0);
+  }
+
+  function closeModal(){
+    overlay.hidden = true;
+    document.body.classList.remove('lead-open');
+    if(trigger && typeof trigger.focus === 'function') trigger.focus();
+  }
+
+  function clearErrors(){
+    statusEl.textContent = '';
+    FIELDS.forEach(function(f){
+      var inp = $('lead-' + f), err = $('lead-' + f + '-err');
+      if(inp) inp.removeAttribute('aria-invalid');
+      if(err) err.textContent = '';
+    });
+  }
+  function showFieldErrors(errs){
+    var first = null;
+    FIELDS.forEach(function(f){
+      if(!errs[f]) return;
+      var inp = $('lead-' + f), err = $('lead-' + f + '-err');
+      if(inp) inp.setAttribute('aria-invalid', 'true');
+      if(err) err.textContent = errs[f];
+      if(!first && inp) first = inp;
+    });
+    if(first) first.focus();
+  }
+
+  function clientValidate(v){
+    var e = {};
+    if(!v.name) e.name = 'Please enter your name.';
+    if(!v.email) e.email = 'Please enter your work email.';
+    else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) e.email = 'That email address doesn\'t look right.';
+    if(!v.organization) e.organization = 'Please enter your organization.';
+    return e;
+  }
+
+  function values(){
+    var v = {};
+    FIELDS.forEach(function(f){ var el = $('lead-' + f); v[f] = el ? el.value.trim() : ''; });
+    v.eventDateUnsure = unsure.checked;
+    if(v.eventDateUnsure) v.eventDate = '';
+    return v;
+  }
+
+  function showBooking(){
+    stepForm.hidden = true; stepBook.hidden = false; dialog.classList.add('lead-wide');
+    setTimeout(function(){ dialog.focus(); }, 0);
+    if(calendlyShown) return;
+    calendlyShown = true;
+    var v = values();
+    var url = CAL_URL + '?hide_gdpr_banner=1&name=' + encodeURIComponent(v.name) + '&email=' + encodeURIComponent(v.email);
+    loadCalendly().then(function(){
+      window.Calendly.initInlineWidget({ url: url, parentElement: $('leadCalendly') });
+    }).catch(function(){
+      fallbackEl.hidden = false;
+      track('lead_form_error', { error_type: 'calendly_load' });
+    });
+  }
+
+  function utm(){
+    var q = new URLSearchParams(location.search), o = {};
+    ['source','medium','campaign','term','content'].forEach(function(k){ var x = q.get('utm_' + k); if(x) o['utm' + k.charAt(0).toUpperCase() + k.slice(1)] = x.slice(0, 200); });
+    return o;
+  }
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    clearErrors();
+    var v = values();
+    var errs = clientValidate(v);
+    if(Object.keys(errs).length){
+      showFieldErrors(errs);
+      track('lead_form_error', { error_type: 'validation', field_count: Object.keys(errs).length });
+      return;
+    }
+    submitBtn.disabled = true; submitBtn.textContent = 'Sending\u2026';
+    var tokenReady = (token && Date.now() - tokenAt < 50 * 60 * 1000) ? Promise.resolve() : fetchToken();
+    tokenReady.then(function(){
+      var payload = Object.assign({}, v, utm(), {
+        token: token,
+        company_website: $('lead-company_website').value,
+        pageUri: (location.origin + location.pathname + location.search).slice(0, 500)
+      });
+      return fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    }).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(body){ return { status: res.status, body: body }; });
+    }).then(function(r){
+      submitBtn.disabled = false; submitBtn.textContent = 'Continue to pick a time';
+      if(r.status === 200){
+        submitted = true; track('generate_lead', { form_location: openedLocation }); showBooking(); return;
+      }
+      if(r.status === 400 && r.body.error === 'validation'){
+        showFieldErrors(r.body.fields || {}); track('lead_form_error', { error_type: 'validation_server' }); return;
+      }
+      if(r.status === 400){
+        track('lead_form_error', { error_type: r.body.error || 'bad_request' });
+        token = ''; fetchToken();
+        statusEl.textContent = r.body.message || 'Something went wrong. Please try again.';
+        return;
+      }
+      if(r.status === 429){
+        track('lead_form_error', { error_type: 'rate_limited' });
+        statusEl.innerHTML = '';
+        statusEl.appendChild(document.createTextNode((r.body.message || 'Too many requests. Please try again later.') + ' '));
+        var a = document.createElement('a'); a.href = CAL_URL; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Book a time here'; a.style.textDecoration = 'underline';
+        statusEl.appendChild(a);
+        return;
+      }
+      // Server or HubSpot trouble: never block booking.
+      if(window.console) console.error('lead save failed', r.status);
+      track('lead_form_error', { error_type: 'server_' + r.status });
+      submitted = true; showBooking();
+    }).catch(function(err){
+      submitBtn.disabled = false; submitBtn.textContent = 'Continue to pick a time';
+      if(window.console) console.error('lead save failed', err);
+      track('lead_form_error', { error_type: 'network' });
+      submitted = true; showBooking();
+    });
+  });
+
+  form.addEventListener('input', function(e){
+    var id = e.target && e.target.id;
+    if(!id || id.indexOf('lead-') !== 0) return;
+    e.target.removeAttribute('aria-invalid');
+    var err = $(id + '-err'); if(err) err.textContent = '';
+  });
+
+  unsure.addEventListener('change', function(){ dateInput.disabled = unsure.checked; if(unsure.checked) dateInput.value = ''; });
+
+  document.querySelectorAll('[data-lead-open]').forEach(function(btn){
+    btn.addEventListener('click', function(){ openModal(btn); });
+  });
+  $('leadClose').addEventListener('click', closeModal);
+  overlay.addEventListener('mousedown', function(e){ if(e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', function(e){
+    if(overlay.hidden) return;
+    if(e.key === 'Escape'){ e.preventDefault(); closeModal(); return; }
+    if(e.key !== 'Tab') return;
+    var f = focusables();
+    if(!f.length){ e.preventDefault(); dialog.focus(); return; }
+    var first = f[0], last = f[f.length - 1];
+    if(e.shiftKey && (document.activeElement === first || document.activeElement === dialog)){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  });
 })();
 </script>
 </body>
