@@ -536,17 +536,17 @@ changes.
 - **Name change to "Judge D Show" is done in code** (`index.html`, `README.md`,
   `src/main.js` header comment, `scripts/stress-test.mjs` comment, this
   file) — same pattern as the earlier rename from "Mas Judging" →
-  "Carnival Judging" (see git log on `main`). Still outstanding: the
-  `judgedshow.com`/`judgedeshow.com` domain purchase and pointing DNS at
-  Vercel, and updating any off-repo references (social profiles, app store
-  listings if any, etc.) — none tracked in this codebase.
-- **Domain purchase**: `judgedshow.com` (primary) + `judgedeshow.com`
-  (defensive alt), ~$11.25/yr each. A Google Calendar reminder is set for
-  Tuesday 2026-09-22. The user's existing domain
-  (`immortelleadvisorygroup.com`) is registered through **Namecheap**
-  (confirmed via nameserver lookup: `dns1/dns2.registrar-servers.com`),
-  not Vercel — for consistency, lean toward buying these through Namecheap
-  too unless told otherwise.
+  "Carnival Judging" (see git log on `main`). Still outstanding: updating
+  any off-repo references (social profiles, app store listings if any,
+  etc.) — none tracked in this codebase.
+- **Domain purchase — done.** Kirt confirmed 2026-11-04 that `judgedshow.com`
+  is bought, and it was already serving the app by 2026-09-24 (admin view
+  verified live at `judgedshow.com/app?admin=1`). Not confirmed: whether the
+  defensive alt `judgedeshow.com` was also bought and whether it redirects
+  to the primary. Still undecided: whether the domain root goes to `/`
+  (marketing) or `/app` (login) — see "URL structure" above. The user's
+  other domain (`immortelleadvisorygroup.com`) is registered through
+  **Namecheap**, not Vercel.
 - **Background visual**: user wants something "more Trini" than the
   current flat navy gradient. First attempt (AI-generated abstract
   texture) failed — the "steelpan" and "mas feather" motifs read as
