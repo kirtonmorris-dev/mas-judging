@@ -56,9 +56,12 @@ judging app isn't the first thing a prospect hits:
 - **`/` (repo root `index.html`)** — the marketing/landing page. A
   self-contained static page (own inline styles, own fonts — Fraunces +
   IBM Plex Sans, the same pairing the app uses), anchor
-  links to its own sections, "Book a Call"/"Request a Quote" buttons to
-  Calendly. **Do not wire this into the app** — no Supabase, no judging
-  logic, nothing beyond static content and anchor links to itself. It is
+  links to its own sections. Every "Book a Call"/"Request a Quote" button opens
+  the lead-form modal (see "Lead capture" below) instead of linking to Calendly.
+  **The page itself stays static and never touches Supabase or HubSpot, and is
+  not wired into the app.** The only server contact is the lead form posting to
+  the `/api/lead` serverless function; only that
+  function talk to Supabase and HubSpot. It is
   indexed by search engines (no robots meta tag).
 - **`/app` (`app/index.html`, `app/styles.css`, `app/src/`)** — the
   actual judging app (PIN login, judge scoring, organizer tally, print
@@ -121,8 +124,9 @@ judging app isn't the first thing a prospect hits:
   used to say Bebas Neue + Inter — that was stale; the code has used
   Fraunces + IBM Plex Sans on a light cream background since before the
   Direction 1a rebrand below, and this line is now corrected to match.
-- **No server-side code.** All logic runs in the browser; the browser talks
-  straight to Supabase's REST/RPC endpoints.
+- **Mostly no server-side code.** The judging app runs in the browser and talks
+  straight to Supabase's REST/RPC endpoints. The exceptions are the Vercel
+  serverless functions under `api/` (admin proxy, and the marketing lead form).
 - **Dev tooling**: `scripts/stress-test.mjs` — a standalone Node 18+ script
   (no deps) that load-tests the Supabase backend's concurrency safety
   against a disposable synthetic event. Run with `node scripts/stress-test.mjs`
@@ -1405,3 +1409,68 @@ Kirt Morris, Founder & Principal Consultant." Kirt (via Immortelle Advisory
 Group) owns this platform; it was not built as the property of any one
 client organization (e.g. WIADCA). Keep this attribution intact in any
 future rewrite, including after the Judge D Show rename.
+
+## Lead capture (marketing page -> Supabase -> HubSpot -> Calendly)
+
+**Flow**: any `[data-lead-open]` button on `index.html` (nav, hero, pricing,
+final CTA) opens an accessible modal (focus trap, Escape closes, focus returns
+to the button). On submit the lead goes to `POST /api/lead`; then the Calendly
+inline scheduler appears in the same modal with name and email prefilled
+(`https://calendly.com/kirt-immortelleadvisorygroup/30min`). The Calendly
+widget script/CSS load only when the modal opens. If the widget fails, a plain
+"Book a time" link shows. A server or HubSpot error never blocks booking.
+Buttons say "20-Minute Call" while the Calendly event is 30 minutes: deliberate
+(signals a quick call), do not "fix" it. Consent line links to
+https://www.immortelleadvisorygroup.com/privacy (no privacy page in this repo).
+
+**Fields**: required name, work email, organization. Optional phone,
+competition type, event date (or "Not sure yet"), judges range, contestants
+range, how-heard/message. Option lists live in `api/_lib/contactValidation.js`
+(`COMPETITION_TYPES`, `JUDGES_RANGES`, `CONTESTANTS_RANGES`) and must match the
+HubSpot dropdown option values exactly.
+
+**Endpoints** (one function, `api/lead.js`, because Vercel Hobby caps a
+deployment at 12 functions and `api/admin/` already has 11, so there is NO
+headroom for another function until admin routes are consolidated or the plan
+changes): `GET /api/lead` (signed issue-time token, HMAC with
+`LEAD_TOKEN_SECRET`); `POST /api/lead`. Order: honeypot -> unknown fields ->
+validation -> token/fill-time -> rate limit -> save to `leads` -> HubSpot ->
+record HubSpot result. Files: `api/lead.js`,
+`api/_lib/leadToken.js`, `leadStore.js`, `hubspot.js`.
+
+**Spam rules**: honeypot field `company_website` (off-screen, aria-hidden, not
+`display:none`); token must be 3 seconds to 1 hour old. Honeypot and
+missing/invalid/too-fast token get a normal 200 success, are stored with status
+`spam_honeypot` / `spam_too_fast` (`status_detail` says why), and are never sent
+to HubSpot. An expired token (>1 hour) gets an honest 400 "try again". Rate
+limit per SHA-256 hashed IP (first `x-forwarded-for` address, salted with
+`LEAD_IP_SALT`; raw IP never stored): 5 accepted per hour, 15 per day, counted
+from the table; over the limit -> 429 and a `rate_limited` row. No captcha.
+
+**Table** `public.leads` (migration `scripts/migrations/2026-11-04_leads.sql`,
+additive): RLS on, no policies, all grants revoked from anon/authenticated/
+public; only the service-role key reads or writes. `status`:
+accepted | spam_honeypot | spam_too_fast | rate_limited. `hubspot_status`:
+pending | sent | failed, plus `hubspot_http_status` and `hubspot_error`.
+**Resend failed leads**: `node scripts/resend-failed-leads.mjs [--dry-run]`
+(needs the four env vars below; run locally). Resends accepted rows whose
+`hubspot_status` is failed or pending. Resent rows carry no ipAddress.
+
+**HubSpot** (portal 245957556, free plan): Forms API unauthenticated submit,
+`POST https://api.hsforms.com/submissions/v3/integration/submit/{portal}/{form}`.
+Fields sent: built-in `firstname`, `lastname` (name split on first space),
+`email`, `phone`, `company`; custom contact
+properties `competition_type` (dropdown), `event_date` (date), `judges_range`
+(dropdown), `contestants_range` (dropdown), `heard_about_or_message`
+(multi-line), `lead_source_site` (= `judgedshow.com`). Every one must also be a
+field on the HubSpot form. Lifecycle stage is NOT sent (not a form field); the form's own "Set lifecycle stage to: Lead" setting handles it. Contact only: no deal, no company record. Set
+`HUBSPOT_SEND_CONSENT=1` only if the form's GDPR setting requires
+`legalConsentOptions`.
+
+**Env vars (Vercel, Production and Preview; names only)**: `HUBSPOT_PORTAL_ID`,
+`HUBSPOT_FORM_GUID`, `LEAD_TOKEN_SECRET`, `LEAD_IP_SALT`, existing
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional `HUBSPOT_SEND_CONSENT`.
+
+**GA4**: `lead_form_open` (param `location`), `generate_lead`,
+`lead_form_error` (param `error_type`). No personal data is sent. The four
+Book buttons had no `data-ga-event` attributes before this change.
