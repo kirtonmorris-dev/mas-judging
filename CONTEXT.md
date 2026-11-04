@@ -541,9 +541,9 @@ changes.
   etc.) — none tracked in this codebase.
 - **Domain purchase — done.** Kirt confirmed 2026-11-04 that `judgedshow.com`
   is bought, and it was already serving the app by 2026-09-24 (admin view
-  verified live at `judgedshow.com/app?admin=1`). Not confirmed: whether the
-  defensive alt `judgedeshow.com` was also bought and whether it redirects
-  to the primary. Still undecided: whether the domain root goes to `/`
+  verified live at `judgedshow.com/app?admin=1`). Kirt also bought the defensive alt
+  `judgedeshow.com` (confirmed 2026-11-04). Not confirmed: whether it is
+  pointed at Vercel and redirects to the primary. Still undecided: whether the domain root goes to `/`
   (marketing) or `/app` (login) — see "URL structure" above. The user's
   other domain (`immortelleadvisorygroup.com`) is registered through
   **Namecheap**, not Vercel.
