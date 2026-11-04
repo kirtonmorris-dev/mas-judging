@@ -1474,3 +1474,24 @@ field on the HubSpot form. Lifecycle stage is NOT sent (not a form field); the f
 **GA4**: `lead_form_open` (param `location`), `generate_lead`,
 `lead_form_error` (param `error_type`). No personal data is sent. The four
 Book buttons had no `data-ga-event` attributes before this change.
+
+**Lead capture: verified live 2026-11-04, and one trap to know about.** Two
+test leads went browser -> `/api/lead` -> `leads` -> HubSpot on production
+with every property filled, name split into first/last, and lifecycle stage
+Lead (set by the form's own setting). Test rows and contacts were deleted
+afterward.
+- **HubSpot returns HTTP 200 even when it blocks a submission as spam**, so
+  `leads.hubspot_status = 'sent'` only means HubSpot received it, NOT that a
+  contact exists. The first live test was blocked with spam type "Unregistered
+  Site Domain" until `judgedshow.com` and `www.judgedshow.com` were registered
+  in HubSpot (Bot filtering on the form / Tracking & Analytics settings). If a
+  new domain, subdomain or form is ever used, register it first. When leads
+  seem to be missing from HubSpot, check the form's Spam tab in HubSpot and
+  release blocked submissions there; `scripts/resend-failed-leads.mjs` will
+  NOT catch these, because their `hubspot_status` is `sent`.
+- The form does not tell the visitor when saving fails: Calendly always
+  appears (deliberate). Check Vercel runtime logs (Hobby keeps only 1 hour)
+  and the `leads` table. A preview deploy needs the same four env vars scoped
+  to Preview, or `/api/lead` returns 500 ("LEAD_TOKEN_SECRET is not set").
+- Local-only tests so far (faked Supabase/HubSpot): honeypot, too-fast,
+  tampered token, rate limit, HubSpot-failure recording. Not yet run live.
