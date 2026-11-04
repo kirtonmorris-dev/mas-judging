@@ -12,7 +12,7 @@ over this file and update this file.
 
 ## What this is
 
-A live Carnival competition judging app built and owned by Kirt Morris /
+A live competition judging app (any judged competition; Carnival is the proven origin) built and owned by Kirt Morris /
 Immortelle Advisory Group. Judges score contestants on their phones in real
 time; organizers watch results come in on a live tally and print official
 sign-off sheets at the end. **Not mas-specific** — `src/competitionLibrary.js`
@@ -1364,6 +1364,39 @@ only.
 - **Admin only**: contact fields are not in `get_event_config`,
   `replace_event_config`, or anything judge/organizer sessions call. RLS and
   anon grants were not changed. Migration: `scripts/migrations/2026-10-24_admin_contacts.sql`.
+
+## Marketing positioning: all judged competitions (2026-11-04)
+
+The marketing page (`index.html`) now positions Judge D Show as live scoring
+for **any judged competition**, with Carnival as the proven origin and a
+strength, not the product's identity. Copy-only change; `/app`, the database,
+design tokens, layout, anchors, nav and Calendly links are untouched.
+
+- **Where Carnival intentionally remains**: the proof section ("Where It's
+  Been Used", still anonymized as "an NYC Carnival competition"), the hero
+  "proven live at Carnival competitions in New York and Baltimore" stat, the
+  Categories section (group "Carnival and steelband"), the FAQ (Q1 "proven
+  first", Q10 supported kinds, Q25 "Is Judge D Show only for Carnival?"), and
+  the meta description as a proof point only. It is deliberately **not** in the
+  hero eyebrow, section headings, or any "built for Carnival" identity claim.
+- **Categories section**: two chip groups, "Carnival and steelband" (the 11
+  ready-made families) and "And beyond" (talent shows, pageants and cultural
+  competitions, school and youth competitions, pitch/business/hackathon).
+- **Why It's Different** was reframed around rules-driven judging (per-category
+  criteria and points, blind judging with masked names, per-contestant judge
+  assignment, close judging). The old "generic software is built for
+  hackathons and pageants" contrast was removed.
+- **Only claim what the product does (templates rule)**: ready-made templates
+  exist only for the Carnival families in `competitionLibrary.js` (Mas,
+  Panorama, Calypso, Soca, Chutney, J'ouvert, Traditional Mas, Stick
+  Fighting, Limbo, Schools Carnival, Kiddies Carnival). For pageants, talent
+  shows, pitch events, spelling bees and the like, say "set up your own
+  categories and scoring criteria", never "templates for". Don't add
+  non-Carnival templates to the copy unless they are built.
+- No JSON-LD or `og:`/`twitter:` tags exist on the page; only `description`.
+  No element carries `data-ga-event` (only the delegated listener exists).
+- The Baltimore claim is kept by Kirt's decision, though the database holds no
+  Baltimore event (see the data-discrepancy note at the top).
 
 ## Copyright / ownership note
 
