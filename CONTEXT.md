@@ -1456,11 +1456,11 @@ pending | sent | failed, plus `hubspot_http_status` and `hubspot_error`.
 **HubSpot** (portal 245957556, free plan): Forms API unauthenticated submit,
 `POST https://api.hsforms.com/submissions/v3/integration/submit/{portal}/{form}`.
 Fields sent: built-in `firstname`, `lastname` (name split on first space),
-`email`, `phone`, `company`, `lifecyclestage` (= `lead`); custom contact
+`email`, `phone`, `company`; custom contact
 properties `competition_type` (dropdown), `event_date` (date), `judges_range`
 (dropdown), `contestants_range` (dropdown), `heard_about_or_message`
 (multi-line), `lead_source_site` (= `judgedshow.com`). Every one must also be a
-field on the HubSpot form. Contact only: no deal, no company record. Set
+field on the HubSpot form. Lifecycle stage is NOT sent (not a form field); the form's own "Set lifecycle stage to: Lead" setting handles it. Contact only: no deal, no company record. Set
 `HUBSPOT_SEND_CONSENT=1` only if the form's GDPR setting requires
 `legalConsentOptions`.
 

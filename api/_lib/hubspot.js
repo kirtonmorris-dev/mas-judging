@@ -3,6 +3,8 @@
 //
 // Every field name below must exist BOTH as a contact property in the portal
 // AND as a field on the form, or HubSpot answers FIELD_NOT_IN_FORM_DEFINITION.
+// lifecyclestage is deliberately NOT sent: it is not a form field, and the
+// form's own setting "Set lifecycle stage to: Lead" handles it.
 // Env: HUBSPOT_PORTAL_ID, HUBSPOT_FORM_GUID. Set HUBSPOT_SEND_CONSENT=1 only
 // if the form's GDPR setting requires legalConsentOptions.
 const LEAD_SOURCE = 'judgedshow.com';
@@ -29,7 +31,6 @@ function buildFields(lead) {
     judges_range: lead.judges_range,
     contestants_range: lead.contestants_range,
     heard_about_or_message: lead.heard_about_or_message,
-    lifecyclestage: 'lead',
     lead_source_site: LEAD_SOURCE,
   };
   return Object.entries(raw)
